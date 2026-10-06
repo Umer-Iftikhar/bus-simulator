@@ -115,4 +115,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/*.apk \
-            --title "Bus Simulator $GITHUB_REF_NAME" --generate-notes
+            --title "Bus Simulator $GITHUB_REF_NAME" \
+            --notes-file .github/release-notes.md --generate-notes
