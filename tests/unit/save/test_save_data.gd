@@ -91,17 +91,22 @@ func test_queries_on_unowned_bus_are_safe() -> void:
 	assert_eq(save.damage("coach"), {})
 
 
-func test_mirror_quality_setting_defaults_and_round_trips() -> void:
+func test_graphics_setting_defaults_and_round_trips() -> void:
 	var save := SaveData.new_game()
-	assert_eq(save.settings["mirror_quality"], "high")
-	assert_eq(save.mirror_refresh(), 1)
-	save.settings["mirror_quality"] = "low"
-	assert_eq(save.mirror_refresh(), 3, "battery saver renders mirrors every third frame")
+	assert_eq(save.graphics(), GraphicsSettings.DEFAULT)
+	save.settings["graphics"] = "ultra"
 	var loaded := SaveData.from_dict(JSON.parse_string(JSON.stringify(save.to_dict())))
-	assert_eq(loaded.settings["mirror_quality"], "low")
+	assert_eq(loaded.graphics(), "ultra")
 
 
-func test_unknown_mirror_quality_falls_back_to_high() -> void:
-	var loaded := SaveData.from_dict({"settings": {"mirror_quality": "ultra"}})
-	assert_eq(loaded.settings["mirror_quality"], "high")
-	assert_eq(SaveData.from_dict({"settings": 7}).settings["mirror_quality"], "high")
+func test_unknown_graphics_preset_falls_back_to_default() -> void:
+	var loaded := SaveData.from_dict({"settings": {"graphics": "insane"}})
+	assert_eq(loaded.graphics(), GraphicsSettings.DEFAULT)
+	assert_eq(SaveData.from_dict({"settings": 7}).graphics(), GraphicsSettings.DEFAULT)
+
+
+func test_old_battery_saver_mirror_setting_migrates_to_low_graphics() -> void:
+	var loaded := SaveData.from_dict({"settings": {"mirror_quality": "low"}})
+	assert_eq(loaded.graphics(), "low")
+	var high := SaveData.from_dict({"settings": {"mirror_quality": "high"}})
+	assert_eq(high.graphics(), GraphicsSettings.DEFAULT)

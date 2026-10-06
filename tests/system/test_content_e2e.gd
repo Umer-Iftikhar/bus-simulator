@@ -18,10 +18,10 @@ func after_each() -> void:
 func test_downtown_route_with_battery_saver_mirrors() -> void:
 	var menu: MainMenu = driver.main.menu
 	await driver.select_option(menu.map_picker, "downtown")
-	await driver.select_option(menu.mirror_quality_picker, "low")
+	await driver.select_option(menu.graphics_picker, "low")
 	var saved := driver.saved_state()
 	assert_eq(saved.selected_map, "downtown")
-	assert_eq(saved.settings["mirror_quality"], "low")
+	assert_eq(saved.graphics(), "low")
 
 	await driver.click(driver.main.menu.drive_button)
 	await wait_seconds(1.0)
@@ -59,3 +59,15 @@ func test_night_map_is_drivable_with_headlights() -> void:
 	driver.key(KEY_W, false)
 	assert_gt(session.bus.forward_speed(), 5.0)
 	assert_ne(session.current_lane(), -1)
+
+
+func test_choosing_ultra_graphics_from_the_menu() -> void:
+	await driver.select_option(driver.main.menu.graphics_picker, "ultra")
+	assert_eq(driver.saved_state().graphics(), "ultra", "saved immediately")
+	await driver.click(driver.main.menu.drive_button)
+	await wait_seconds(1.0)
+	var session: DriveSession = driver.main.session
+	assert_eq(get_tree().root.msaa_3d, Viewport.MSAA_4X)
+	assert_eq(session.mirrors.refresh_interval, 1)
+	get_tree().root.msaa_3d = Viewport.MSAA_DISABLED
+	get_tree().root.scaling_3d_scale = 1.0

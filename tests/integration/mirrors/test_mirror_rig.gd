@@ -52,6 +52,8 @@ func test_broken_mirror_stops_rendering() -> void:
 	rig.set_broken(MirrorRig.RIGHT, true)
 	await wait_process_frames(3)
 	assert_false(rig.is_rendering(MirrorRig.RIGHT))
+	var right := rig.viewports[MirrorRig.RIGHT] as SubViewport
+	assert_eq(right.render_target_update_mode, SubViewport.UPDATE_DISABLED, "GPU work stopped")
 	assert_true(rig.is_rendering(MirrorRig.LEFT))
 	assert_true(rig.is_rendering(MirrorRig.REAR), "interior mirror can't be clipped")
 	rig.set_broken(MirrorRig.RIGHT, false)

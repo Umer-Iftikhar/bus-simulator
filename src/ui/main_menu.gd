@@ -13,7 +13,8 @@ var map_picker := OptionButton.new()
 var bus_picker := OptionButton.new()
 var map_info := Label.new()
 var condition_label := Label.new()
-var mirror_quality_picker := OptionButton.new()
+var graphics_picker := OptionButton.new()
+var studio_label := Label.new()
 var drive_button := Button.new()
 var garage_button := Button.new()
 
@@ -47,6 +48,12 @@ func _build() -> void:
 	title.add_theme_font_size_override("font_size", 56)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(title)
+	studio_label.name = "Studio"
+	studio_label.text = "marrij g"
+	studio_label.add_theme_font_size_override("font_size", 34)
+	studio_label.add_theme_color_override("font_color", Color(1.0, 0.78, 0.25))
+	studio_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(studio_label)
 	money_label.name = "Money"
 	money_label.add_theme_font_size_override("font_size", 30)
 	money_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -83,13 +90,14 @@ func _build() -> void:
 	garage_button.pressed.connect(garage_requested.emit)
 	_big(garage_button)
 	column.add_child(garage_button)
-	mirror_quality_picker.name = "MirrorQuality"
-	mirror_quality_picker.add_item("Mirrors: High quality")
-	mirror_quality_picker.set_item_metadata(0, "high")
-	mirror_quality_picker.add_item("Mirrors: Battery saver")
-	mirror_quality_picker.set_item_metadata(1, "low")
-	mirror_quality_picker.item_selected.connect(_on_mirror_quality_selected)
-	column.add_child(mirror_quality_picker)
+	graphics_picker.name = "Graphics"
+	for preset in GraphicsSettings.PRESETS:
+		graphics_picker.add_item("Graphics: %s" % GraphicsSettings.display_name(preset))
+		graphics_picker.set_item_metadata(graphics_picker.item_count - 1, preset)
+	graphics_picker.item_selected.connect(_on_graphics_selected)
+	graphics_picker.custom_minimum_size = Vector2(0, 52)
+	graphics_picker.add_theme_font_size_override("font_size", 22)
+	column.add_child(graphics_picker)
 	refresh()
 
 
@@ -112,9 +120,9 @@ func refresh() -> void:
 		bus_picker.set_item_metadata(bus_picker.item_count - 1, bus_id)
 		if bus_id == save.selected_bus:
 			bus_picker.select(bus_picker.item_count - 1)
-	for i in mirror_quality_picker.item_count:
-		if mirror_quality_picker.get_item_metadata(i) == save.settings["mirror_quality"]:
-			mirror_quality_picker.select(i)
+	for i in graphics_picker.item_count:
+		if graphics_picker.get_item_metadata(i) == save.graphics():
+			graphics_picker.select(i)
 	var damage := garage.damage_of(save.selected_bus)
 	if damage.is_wrecked():
 		condition_label.text = "This bus is wrecked — repair it in the Garage"
@@ -130,8 +138,8 @@ func _on_map_selected(index: int) -> void:
 	selection_changed.emit()
 
 
-func _on_mirror_quality_selected(index: int) -> void:
-	save.settings["mirror_quality"] = mirror_quality_picker.get_item_metadata(index)
+func _on_graphics_selected(index: int) -> void:
+	save.settings["graphics"] = graphics_picker.get_item_metadata(index)
 	selection_changed.emit()
 
 

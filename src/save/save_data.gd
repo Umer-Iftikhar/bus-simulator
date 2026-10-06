@@ -7,7 +7,6 @@ extends RefCounted
 ## partially-corrupt save can never break the game.
 
 const VERSION := 1
-const MIRROR_QUALITIES := ["high", "low"]
 
 var wallet := Wallet.new()
 ## bus_id -> {"upgrades": {key: level}, "paint": id, "paints": [ids], "damage": {}}
@@ -15,7 +14,7 @@ var owned := {}
 var selected_bus := Catalog.STARTER_BUS
 var selected_map := "harbor"
 var stats := {"runs": 0, "delivered": 0, "earned": 0}
-var settings := {"mirror_quality": "high"}
+var settings := {"graphics": GraphicsSettings.DEFAULT}
 var money: int:
 	get:
 		return wallet.balance
@@ -34,9 +33,8 @@ static func default_owned_bus() -> Dictionary:
 	return {"upgrades": upgrades, "paint": "stock", "paints": ["stock"], "damage": {}}
 
 
-## Mirror refresh interval for the current quality setting (1 = every frame).
-func mirror_refresh() -> int:
-	return 3 if settings["mirror_quality"] == "low" else 1
+func graphics() -> String:
+	return settings["graphics"]
 
 
 func owns(bus_id: String) -> bool:
@@ -93,8 +91,12 @@ static func from_dict(data: Dictionary) -> SaveData:
 	save.selected_map = map if Maps.get_map(map) != null else Maps.ids()[0]
 	var raw_settings = data.get("settings", {})
 	if raw_settings is Dictionary:
-		var quality := str(raw_settings.get("mirror_quality", "high"))
-		save.settings["mirror_quality"] = quality if quality in MIRROR_QUALITIES else "high"
+		var preset := str(raw_settings.get("graphics", ""))
+		if preset.is_empty() and raw_settings.get("mirror_quality", "") == "low":
+			preset = "low"  # Older saves only had a battery-saver mirror option.
+		save.settings["graphics"] = (
+			preset if GraphicsSettings.is_valid(preset) else GraphicsSettings.DEFAULT
+		)
 	var raw_stats = data.get("stats", {})
 	if raw_stats is Dictionary:
 		for key in save.stats:

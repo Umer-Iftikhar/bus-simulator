@@ -48,11 +48,32 @@ func test_every_map_builds_a_playable_session() -> void:
 		session.free()
 
 
-func test_main_menu_mirror_quality_picker_updates_settings() -> void:
+func test_main_menu_graphics_picker_updates_settings() -> void:
 	var save := SaveData.new_game()
 	var menu := add_child_autofree(MainMenu.create(save, Garage.new(save))) as MainMenu
 	watch_signals(menu)
-	menu.mirror_quality_picker.select(1)
-	menu.mirror_quality_picker.item_selected.emit(1)
-	assert_eq(save.settings["mirror_quality"], "low")
+	assert_eq(menu.graphics_picker.item_count, GraphicsSettings.PRESETS.size())
+	assert_eq(menu.graphics_picker.get_item_metadata(menu.graphics_picker.selected), "medium")
+	menu.graphics_picker.select(0)
+	menu.graphics_picker.item_selected.emit(0)
+	assert_eq(save.graphics(), "low")
 	assert_signal_emitted(menu, "selection_changed")
+
+
+func test_graphics_preset_is_applied_to_the_session() -> void:
+	for preset in ["low", "ultra"]:
+		await _start(Maps.harbor(), {"graphics": preset})
+		var p := GraphicsSettings.profile(preset)
+		var viewport := session.get_viewport()
+		assert_eq(viewport.msaa_3d, p["msaa"], preset)
+		assert_almost_eq(viewport.scaling_3d_scale, p["render_scale"], 0.001, preset)
+		var sun := session.world.get_node("Sun") as DirectionalLight3D
+		assert_eq(sun.shadow_enabled, p["shadows"], preset)
+		var env := (session.world.get_node("Environment") as WorldEnvironment).environment
+		assert_eq(env.glow_enabled, p["glow"], preset)
+		assert_eq(session.camera_rig.camera.far, p["view_distance"], preset)
+		assert_eq(session.mirrors.refresh_interval, p["mirror_refresh"], preset)
+		session.free()
+	# Leave the shared root viewport as the other tests expect it.
+	get_tree().root.msaa_3d = Viewport.MSAA_DISABLED
+	get_tree().root.scaling_3d_scale = 1.0

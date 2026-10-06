@@ -9,6 +9,7 @@ extends Node3D
 ##   "damage": DamageModel dictionary the bus starts with (default pristine)
 ##   "traffic": bool, spawn AI traffic (default true)
 ##   "mirror_refresh": int, render mirrors every Nth frame (default 1)
+##   "graphics": GraphicsSettings preset name (overrides mirror_refresh)
 
 signal run_finished(result: Dictionary)
 signal exit_requested
@@ -115,6 +116,10 @@ func _ready() -> void:
 	damage.wrecked.connect(_on_wrecked)
 	_on_damage_changed()
 	_show_initial_damage()
+	if options.has("graphics"):
+		GraphicsSettings.apply(
+			options["graphics"], get_viewport(), world, camera_rig.camera, mirrors
+		)
 	_refresh_hud()
 
 
