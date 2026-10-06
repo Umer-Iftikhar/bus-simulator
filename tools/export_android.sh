@@ -19,7 +19,8 @@ mkdir -p "$OUT_DIR"
 
 # Godot refuses to export when release credentials are only partially set,
 # so they are exported only for release builds.
-unset GODOT_ANDROID_KEYSTORE_RELEASE_PATH GODOT_ANDROID_KEYSTORE_RELEASE_USER   GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD
+unset GODOT_ANDROID_KEYSTORE_RELEASE_PATH GODOT_ANDROID_KEYSTORE_RELEASE_USER \
+  GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD
 if [[ "$MODE" == "release" ]]; then
   export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="${RELEASE_KEYSTORE_PATH:?}"
   export GODOT_ANDROID_KEYSTORE_RELEASE_USER="${RELEASE_KEYSTORE_ALIAS:?}"
@@ -74,7 +75,7 @@ done
 
 BUILD_TOOLS=$(ls -d "${ANDROID_SDK_ROOT:-$ANDROID_HOME}"/build-tools/* | sort -V | tail -1)
 "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | head -3
-badging=$("$BUILD_TOOLS/aapt" dump badging "$APK")
+badging=$("$BUILD_TOOLS/aapt2" dump badging "$APK")
 grep -q "package: name='com.umeriftikhar.bussimulator'" <<<"$badging" \
   || { echo "::error::unexpected package name"; exit 1; }
 grep -q "versionName='$VERSION_NAME'" <<<"$badging" \
