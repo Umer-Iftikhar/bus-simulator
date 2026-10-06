@@ -83,3 +83,29 @@ func test_bends_are_drivable_by_a_bus() -> void:
 func test_stop_offset_matches_fraction() -> void:
 	var map := Maps.harbor()
 	assert_almost_eq(map.stop_offset(1), map.stops[1] * map.track().length(), 0.001)
+
+
+func test_a_handful_of_characterful_maps() -> void:
+	var maps := Maps.all()
+	assert_between(maps.size(), 4, 6, "quality over quantity")
+	var grounds := {}
+	var fares := {}
+	var has_night := false
+	for map in maps:
+		grounds[map.ground_color] = true
+		fares[map.fare] = true
+		has_night = has_night or map.night
+		assert_false(map.description.is_empty(), map.id)
+	assert_eq(grounds.size(), maps.size(), "each map looks different")
+	assert_gt(fares.size(), 2, "harder/prettier maps pay differently")
+	assert_true(has_night, "at least one night map")
+
+
+func test_busiest_map_pays_best() -> void:
+	var busiest: MapDef = null
+	var best_fare := 0
+	for map in Maps.all():
+		best_fare = maxi(best_fare, map.fare)
+		if busiest == null or map.traffic_cars > busiest.traffic_cars:
+			busiest = map
+	assert_eq(busiest.fare, best_fare, "the hardest map rewards it")

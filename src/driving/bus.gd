@@ -21,6 +21,9 @@ const MAX_DRIVING_ACCEL := 14.0
 ## How far the side mirror heads stick out beyond the body.
 const MIRROR_REACH := 0.35
 const MIRROR_HEAD := Vector3(0.12, 0.42, 0.26)
+const DOOR_WIDTH := 1.1
+const DOOR_TRAVEL := 1.05
+const DOOR_TIME := 0.4
 
 var spec: BusSpec
 var input := DriveInput.new()
@@ -38,6 +41,9 @@ var handling_factor := 1.0
 var controls_enabled := true
 ## DamageModel mirror part -> MeshInstance3D showing the mirror glass.
 var mirror_glass := {}
+var doors_open := false
+var door: MeshInstance3D
+var headlights: Array[SpotLight3D] = []
 
 var _target_throttle := 0.0
 var _target_brake := 0.0
@@ -91,6 +97,8 @@ func _build() -> void:
 
 	_build_lamps()
 	_build_mirrors()
+	_build_door(body_height)
+	_build_headlights()
 	_build_panel_overlays(body_height)
 
 	var half_track := spec.width / 2.0 - 0.15
@@ -124,6 +132,75 @@ func _build_windows(body_height: float) -> void:
 	windscreen.name = "Windscreen"
 	windscreen.position = Vector3(0, BODY_CLEARANCE + body_height * 0.66, spec.length / 2.0 + 0.01)
 	add_child(windscreen)
+
+
+## Front passenger door on the kerb (right, -X) side; it slides back to open.
+func _build_door(body_height: float) -> void:
+	door = MeshInstance3D.new()
+	door.name = "Door"
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.06, body_height * 0.8, DOOR_WIDTH)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.2, 0.25, 0.3)
+	material.metallic = 0.4
+	mesh.material = material
+	door.mesh = mesh
+	door.position = door_closed_position()
+	add_child(door)
+
+
+func door_closed_position() -> Vector3:
+	var body_height := spec.height - BODY_CLEARANCE
+	return Vector3(
+		-spec.width / 2.0 - 0.04,
+		BODY_CLEARANCE + body_height * 0.42,
+		spec.length / 2.0 - 0.6 - DOOR_WIDTH / 2.0
+	)
+
+
+func door_open_position() -> Vector3:
+	return door_closed_position() + Vector3(-0.08, 0.0, -DOOR_TRAVEL)
+
+
+func open_doors() -> void:
+	_move_door(true)
+
+
+func close_doors() -> void:
+	_move_door(false)
+
+
+func _move_door(open: bool) -> void:
+	if doors_open == open:
+		return
+	doors_open = open
+	var target := door_open_position() if open else door_closed_position()
+	if not is_inside_tree():
+		door.position = target
+		return
+	var tween := create_tween()
+	tween.tween_property(door, "position", target, DOOR_TIME)
+
+
+func _build_headlights() -> void:
+	for side in [1.0, -1.0]:
+		var lamp := SpotLight3D.new()
+		lamp.name = "Headlight%s" % ("L" if side > 0.0 else "R")
+		lamp.position = Vector3(side * (spec.width / 2.0 - 0.35), 0.95, spec.length / 2.0 + 0.05)
+		# SpotLight3D shines down its -Z; turn it to face the bus's +Z.
+		lamp.rotation = Vector3(-0.08, PI, 0.0)
+		lamp.spot_range = 45.0
+		lamp.spot_angle = 32.0
+		lamp.light_energy = 6.0
+		lamp.light_color = Color(1.0, 0.95, 0.85)
+		lamp.visible = false
+		add_child(lamp)
+		headlights.append(lamp)
+
+
+func set_headlights(on: bool) -> void:
+	for lamp in headlights:
+		lamp.visible = on
 
 
 ## Bus-local centre of a side mirror head ([constant DamageModel.MIRROR_LEFT] or RIGHT).
