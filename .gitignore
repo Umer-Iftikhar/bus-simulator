@@ -1,0 +1,14 @@
+# Godot
+.godot/
+*.import.tmp
+/android/
+# Build & test output
+/build/
+/reports/
+*.apk
+*.aab
+*.keystore
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
