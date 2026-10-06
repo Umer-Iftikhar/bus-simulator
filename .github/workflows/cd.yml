@@ -1,0 +1,118 @@
+name: CD
+
+on:
+  push:
+    branches: [main, ci/android-cd]  # TEMP: verify export before merging
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: 4.4-stable
+  TEMPLATES_DIR: ~/.local/share/godot/export_templates/4.4.stable
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  android:
+    name: Android APK
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      version: ${{ steps.version.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: ./.github/actions/setup-godot
+        with:
+          version: ${{ env.GODOT_VERSION }}
+
+      - name: Cache export templates
+        id: templates
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TEMPLATES_DIR }}
+          key: godot-templates-android-${{ env.GODOT_VERSION }}
+
+      - name: Download Android export templates
+        if: steps.templates.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          unzip -q templates.tpz "templates/android*" "templates/version.txt"
+          mkdir -p ${{ env.TEMPLATES_DIR }}
+          mv templates/* ${{ env.TEMPLATES_DIR }}/
+          rm -rf templates templates.tpz
+          ls -la ${{ env.TEMPLATES_DIR }}
+
+      - name: Determine version
+        id: version
+        run: |
+          base=$(sed -n 's/^config\/version="\(.*\)"/\1/p' project.godot)
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            name="${GITHUB_REF_NAME#v}"
+          else
+            name="${base}-build.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "Version: $name (code ${GITHUB_RUN_NUMBER})"
+
+      - name: Prepare release keystore
+        id: keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [[ -n "$KEYSTORE_B64" ]]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release keystore secret; building a debug-signed APK."
+            echo "mode=debug" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Export APK
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ runner.temp }}/release.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          tools/export_android.sh "${{ steps.version.outputs.name }}" "${GITHUB_RUN_NUMBER}" \
+            "${{ steps.keystore.outputs.mode }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bus-simulator-apk
+          path: build/android/*.apk
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bus-simulator-apk
+          path: dist
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.apk \
+            --title "Bus Simulator $GITHUB_REF_NAME" --generate-notes

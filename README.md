@@ -17,7 +17,7 @@ The full design lives in [docs/game-design.md](docs/game-design.md).
 | `tests/integration/` | Several real nodes working together in a live tree and physics world. |
 | `tests/system/` | End-to-end: real game scenes are booted and driven with simulated input. |
 | `tools/` | `run_tests.sh` and `lint.sh`, used both locally and in CI. |
-| `.github/workflows/` | CI pipeline (lint + test pyramid). |
+| `.github/workflows/` | CI (lint + test pyramid) and CD (Android APK export, releases). |
 
 ## Running tests locally
 
@@ -42,6 +42,22 @@ tools/lint.sh
 * **CI** (`ci.yml`) runs on every branch push and pull request:
   `lint` and `unit` in parallel → `integration` → `system`.
   Each stage uploads its JUnit report and writes a summary to the job page.
+* **CD** (`cd.yml`) runs on every push to `main` and on `v*` tags: the full CI
+  pipeline, then a headless Android export (`tools/export_android.sh`). The APK
+  is verified (signed, arm64, correct package/version, and **no INTERNET
+  permission** since the game is fully offline) and uploaded as an artifact.
+  Tags also publish a GitHub Release with the APK attached.
+
+### Release signing
+
+Without secrets, CD produces a debug-signed APK. To ship release-signed builds,
+add these repository secrets:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 release.keystore` |
+| `ANDROID_KEYSTORE_ALIAS` | key alias |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore/key password |
 
 ## Workflow
 
