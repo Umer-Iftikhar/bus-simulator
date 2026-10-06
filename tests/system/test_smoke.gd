@@ -3,7 +3,9 @@ extends TestCase
 
 
 func test_game_runs_for_three_seconds_without_errors() -> void:
-	var scene: PackedScene = load(ProjectSettings.get_setting("application/run/main_scene"))
-	var main := add_child_autofree(scene.instantiate())
+	var driver := GameDriver.new(self)
+	var main := await driver.boot()
 	await wait_seconds(3.0)
 	assert_true(is_instance_valid(main) and main.is_inside_tree())
+	assert_not_null(main.menu, "main menu visible")
+	driver.cleanup_save()

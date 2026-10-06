@@ -12,6 +12,7 @@ func before_each() -> void:
 
 func after_each() -> void:
 	driver.release_all()
+	driver.cleanup_save()
 
 
 func _start_drive() -> DriveSession:

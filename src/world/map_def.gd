@@ -35,3 +35,11 @@ func track() -> Track:
 
 func stop_offset(index: int) -> float:
 	return stops[index] * track().length()
+
+
+func stop_name(index: int) -> String:
+	if index == 0:
+		return "%s Terminal" % display_name.split(" ")[0]
+	if index == stops.size() - 1:
+		return "End Terminal"
+	return "Stop %d" % index
