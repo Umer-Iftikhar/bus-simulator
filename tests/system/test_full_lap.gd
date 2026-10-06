@@ -1,6 +1,6 @@
 extends TestCase
-## Every map must be drivable end to end: an autopilot using the player's input
-## actions completes a full lap without leaving the road or rolling the bus.
+## Every map must be drivable by every bus: an autopilot using the player's
+## input actions completes a full lap without leaving the road or rolling over.
 
 const LAP_TIME_LIMIT := 240.0
 
@@ -12,13 +12,14 @@ func after_each() -> void:
 	Input.action_release("steer_right")
 
 
-func test_autopilot_completes_a_lap_on_every_map() -> void:
+func test_every_bus_completes_a_lap_on_every_map() -> void:
 	for map in Maps.all():
-		await _drive_lap(map)
+		for bus_id in Catalog.bus_ids():
+			await _drive_lap(map, bus_id)
 
 
-func _drive_lap(map: MapDef) -> void:
-	var session := DriveSession.create(map, BusSpec.new())
+func _drive_lap(map: MapDef, bus_id: String) -> void:
+	var session := DriveSession.create(map, Catalog.bus_spec(bus_id), {"seed": 1})
 	add_child_autofree(session)
 	await wait_seconds(1.0)
 	var bus := session.bus
@@ -46,7 +47,7 @@ func _drive_lap(map: MapDef) -> void:
 		if progress >= track.length():
 			break
 	pilot.release()
-	var where := "map %s" % map.id
+	var where := "%s on %s" % [bus_id, map.id]
 	assert_ge(
 		progress,
 		track.length(),

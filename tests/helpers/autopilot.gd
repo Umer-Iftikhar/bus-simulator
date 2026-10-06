@@ -46,6 +46,31 @@ func step() -> void:
 		_set_pedals(0.35, 0.0)
 
 
+## Drives to and pulls up at every remaining stop of [param run] in order.
+## [param skip] lists stop indices to drive straight past. Returns true when
+## the run finished within the time limit.
+func drive_route(
+	tree: SceneTree, run: RunController, skip: Array = [], seconds_per_stop := 90.0
+) -> bool:
+	while not run.finished:
+		var index := run.route.next_stop
+		stop_at = -1.0 if skip.has(index) else run.map.stop_offset(index)
+		var ticks := int(seconds_per_stop * Engine.physics_ticks_per_second)
+		var advanced := false
+		for i in ticks:
+			step()
+			await tree.physics_frame
+			if run.finished or run.route.next_stop != index:
+				advanced = true
+				break
+		if not advanced:
+			release()
+			return false
+	release()
+	stop_at = -1.0
+	return true
+
+
 func stopped() -> bool:
 	return absf(bus.forward_speed()) < 0.3
 
