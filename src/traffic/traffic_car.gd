@@ -62,6 +62,11 @@ func _build() -> void:
 	add_child(cabin)
 
 
+## World-space velocity along the road.
+func velocity() -> Vector3:
+	return track.forward_at(offset) * speed
+
+
 func front_offset() -> float:
 	return offset + LENGTH / 2.0
 
