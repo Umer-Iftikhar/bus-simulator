@@ -86,9 +86,9 @@ jobs:
 
       - name: Export APK
         env:
-          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ runner.temp }}/release.keystore
-          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
-          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          RELEASE_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           tools/export_android.sh "${{ steps.version.outputs.name }}" "${GITHUB_RUN_NUMBER}" \
             "${{ steps.keystore.outputs.mode }}"

@@ -5,7 +5,7 @@
 # Requires: GODOT, Godot export templates for the same version, an Android SDK
 # (ANDROID_SDK_ROOT), a JDK (JAVA_HOME) and a keystore. For debug builds a
 # keystore is generated when GODOT_ANDROID_KEYSTORE_DEBUG_PATH is not set.
-# Release builds read GODOT_ANDROID_KEYSTORE_RELEASE_{PATH,USER,PASSWORD}.
+# Release builds read RELEASE_KEYSTORE_{PATH,ALIAS,PASSWORD}.
 set -euo pipefail
 
 VERSION_NAME="${1:?version name}"
@@ -16,6 +16,15 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="$ROOT/build/android"
 APK="$OUT_DIR/bus-simulator-$VERSION_NAME-$MODE.apk"
 mkdir -p "$OUT_DIR"
+
+# Godot refuses to export when release credentials are only partially set,
+# so they are exported only for release builds.
+unset GODOT_ANDROID_KEYSTORE_RELEASE_PATH GODOT_ANDROID_KEYSTORE_RELEASE_USER   GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD
+if [[ "$MODE" == "release" ]]; then
+  export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="${RELEASE_KEYSTORE_PATH:?}"
+  export GODOT_ANDROID_KEYSTORE_RELEASE_USER="${RELEASE_KEYSTORE_ALIAS:?}"
+  export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="${RELEASE_KEYSTORE_PASSWORD:?}"
+fi
 
 if [[ "$MODE" == "debug" && -z "${GODOT_ANDROID_KEYSTORE_DEBUG_PATH:-}" ]]; then
   export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$OUT_DIR/debug.keystore"
