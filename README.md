@@ -6,6 +6,20 @@ buses, upgrades and paint jobs. Careless driving costs you in repairs.
 
 The full design lives in [docs/game-design.md](docs/game-design.md).
 
+## Install on your Android phone
+
+1. On the phone, sign in to GitHub in your browser (the repository is private),
+   then open the **[latest release](https://github.com/Umer-Iftikhar/bus-simulator/releases/latest)**.
+2. Under **Assets**, tap `bus-simulator-<version>-debug.apk` to download it.
+3. Open the downloaded file. When asked, allow your browser / Files app to
+   **install unknown apps**, then tap **Install** (if Play Protect warns, choose
+   **More details → Install anyway**).
+4. Open **Bus Simulator** and rotate the phone to landscape.
+
+Requires Android 7.0+ on a 64-bit phone; no internet needed to play. Full guide
+with USB/ADB install, updating and troubleshooting:
+**[docs/install-android.md](docs/install-android.md)**.
+
 ## Features
 
 * **Driving** — procedural `VehicleBody3D` buses with a realistic drivetrain
