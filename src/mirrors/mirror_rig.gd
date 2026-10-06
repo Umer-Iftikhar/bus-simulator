@@ -71,8 +71,10 @@ func set_broken(view: String, is_broken: bool) -> void:
 	_apply_update_modes()
 
 
+## True while the mirror is live (not shattered). With a reduced refresh rate a
+## live mirror still skips some frames; see [method should_refresh].
 func is_rendering(view: String) -> bool:
-	return (viewports[view] as SubViewport).render_target_update_mode != SubViewport.UPDATE_DISABLED
+	return not broken[view]
 
 
 ## Pixels rendered when every mirror updates.

@@ -55,7 +55,7 @@ func start_drive() -> void:
 	var options := {
 		"performance": garage.performance(save.selected_bus),
 		"damage": save.damage(save.selected_bus),
-		"mirror_refresh": save.mirror_refresh(),
+		"graphics": save.graphics(),
 	}
 	if run_seed >= 0:
 		options["seed"] = run_seed

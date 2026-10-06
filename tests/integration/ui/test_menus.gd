@@ -118,7 +118,15 @@ func test_every_main_menu_control_is_on_screen() -> void:
 	var menu := add_child_autofree(MainMenu.create(save, garage)) as MainMenu
 	await wait_process_frames(2)
 	var screen := Rect2(Vector2.ZERO, menu.size)
-	for control in [menu.map_picker, menu.bus_picker, menu.drive_button, menu.garage_button]:
+	var controls := [
+		menu.studio_label,
+		menu.map_picker,
+		menu.bus_picker,
+		menu.drive_button,
+		menu.garage_button,
+		menu.graphics_picker,
+	]
+	for control in controls:
 		assert_true(screen.encloses(control.get_global_rect()), "%s on screen" % control.name)
 
 
@@ -134,3 +142,17 @@ func test_results_panel_is_centred_on_screen() -> void:
 		Vector3(viewport.get_center().x, viewport.get_center().y, 0),
 		2.0
 	)
+
+
+func test_main_menu_shows_marrij_g() -> void:
+	var menu := add_child_autofree(MainMenu.create(save, garage)) as MainMenu
+	await wait_process_frames(2)
+	var found := menu.find_children("*", "Label", true, false).filter(
+		func(l: Label) -> bool: return l.text == "marrij g"
+	)
+	assert_eq(found.size(), 1, "the words 'marrij g' appear on the main menu")
+	var label := found[0] as Label
+	assert_true(label.is_visible_in_tree())
+	var screen := Rect2(Vector2.ZERO, menu.size)
+	assert_true(screen.encloses(label.get_global_rect()), "fully on screen")
+	assert_ge(label.get_theme_font_size("font_size"), 28, "big enough to read")
