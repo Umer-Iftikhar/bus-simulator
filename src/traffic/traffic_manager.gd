@@ -24,6 +24,8 @@ const LANE_MARGIN := 0.3
 
 var track: Track
 var bus: Bus
+## Lane the player is signalling into (see [Indicators]); -1 when not signalling.
+var signal_lane := -1
 var cars: Array[TrafficCar] = []
 var follow := CarFollow.new()
 
@@ -59,9 +61,13 @@ func _physics_process(delta: float) -> void:
 	var accelerations: Array[float] = []
 	for car in cars:
 		var leader := _leader_of(car, bus_state)
-		accelerations.append(
-			follow.acceleration(car.speed, car.desired_speed, leader["gap"], leader["speed"])
+		var accel := follow.acceleration(
+			car.speed, car.desired_speed, leader["gap"], leader["speed"]
 		)
+		car.yielding = leader["yield"]
+		if car.yielding:
+			accel = maxf(accel, -GiveWay.MAX_YIELD_DECEL)
+		accelerations.append(accel)
 	for i in cars.size():
 		cars[i].advance(accelerations[i], delta)
 
@@ -70,6 +76,7 @@ func _physics_process(delta: float) -> void:
 func _leader_of(car: TrafficCar, bus_state: Dictionary) -> Dictionary:
 	var best_gap := INF
 	var best_speed := 0.0
+	var yielding := false
 	for other in cars:
 		if other == car or other.lane != car.lane:
 			continue
@@ -86,7 +93,15 @@ func _leader_of(car: TrafficCar, bus_state: Dictionary) -> Dictionary:
 			if gap < best_gap:
 				best_gap = gap
 				best_speed = maxf(bus_state["speed"], 0.0)
-	return {"gap": best_gap, "speed": best_speed}
+	elif not bus_state.is_empty():
+		var ahead := track.distance_ahead(car.offset, bus_state["center"])
+		if GiveWay.should_yield(car.lane, signal_lane, ahead, bus_state["length"]):
+			var gap := GiveWay.virtual_gap(ahead, bus_state["length"], TrafficCar.LENGTH)
+			if gap < best_gap:
+				best_gap = gap
+				best_speed = maxf(bus_state["speed"], 0.0)
+				yielding = true
+	return {"gap": best_gap, "speed": best_speed, "yield": yielding}
 
 
 func _bus_state() -> Dictionary:

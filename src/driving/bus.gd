@@ -41,6 +41,7 @@ var _body_mesh: MeshInstance3D
 var _paint := Color.WHITE
 var _wear := 0.0
 var _last_velocity := Vector3.ZERO
+var _lamps := {}
 
 
 static func create(bus_spec: BusSpec) -> Bus:
@@ -81,6 +82,8 @@ func _build() -> void:
 	set_paint(spec.color)
 	_build_windows(body_height)
 
+	_build_lamps()
+
 	var half_track := spec.width / 2.0 - 0.15
 	var axle := spec.wheelbase() / 2.0
 	var attach_y := WHEEL_RADIUS + SUSPENSION_REST - 0.12
@@ -112,6 +115,45 @@ func _build_windows(body_height: float) -> void:
 	windscreen.name = "Windscreen"
 	windscreen.position = Vector3(0, BODY_CLEARANCE + body_height * 0.66, spec.length / 2.0 + 0.01)
 	add_child(windscreen)
+
+
+func _build_lamps() -> void:
+	var x := spec.width / 2.0 - 0.12
+	var z := spec.length / 2.0 + 0.03
+	var y := BODY_CLEARANCE + 0.45
+	var spots := {
+		"front_left": Vector3(x, y, z),
+		"rear_left": Vector3(x, y, -z),
+		"front_right": Vector3(-x, y, z),
+		"rear_right": Vector3(-x, y, -z),
+	}
+	for lamp_name in spots:
+		var lamp := MeshInstance3D.new()
+		lamp.name = "Lamp_" + lamp_name
+		var box := BoxMesh.new()
+		box.size = Vector3(0.22, 0.14, 0.06)
+		lamp.mesh = box
+		lamp.position = spots[lamp_name]
+		add_child(lamp)
+		_lamps[lamp_name] = lamp
+	set_indicator_lamps(false, false)
+
+
+## Lights the left and/or right indicator lamps (front and rear).
+func set_indicator_lamps(left_on: bool, right_on: bool) -> void:
+	for lamp_name in _lamps:
+		var lit: bool = left_on if lamp_name.ends_with("left") else right_on
+		var material := StandardMaterial3D.new()
+		material.albedo_color = Color(1.0, 0.55, 0.0) if lit else Color(0.35, 0.22, 0.1)
+		material.emission_enabled = lit
+		material.emission = Color(1.0, 0.6, 0.1)
+		material.emission_energy_multiplier = 3.0
+		(_lamps[lamp_name] as MeshInstance3D).material_override = material
+
+
+func is_lamp_lit(lamp_name: String) -> bool:
+	var lamp := _lamps[lamp_name] as MeshInstance3D
+	return (lamp.material_override as StandardMaterial3D).emission_enabled
 
 
 func _add_wheel(wheel_name: String, at: Vector3, steering: bool, traction: bool) -> void:
