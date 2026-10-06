@@ -6,6 +6,10 @@ buses, upgrades and paint jobs. Careless driving costs you in repairs.
 
 The full design lives in [docs/game-design.md](docs/game-design.md).
 
+| Driver's seat | Downtown | Pine Hills by night |
+|---|---|---|
+| ![Driver view](docs/screenshots/driver-view.png) | ![Downtown](docs/screenshots/downtown.png) | ![Night](docs/screenshots/night.png) |
+
 ## Install on your Android phone
 
 1. On the phone, open the **[latest release](https://github.com/Umer-Iftikhar/bus-simulator/releases/latest)**
@@ -37,6 +41,10 @@ with USB/ADB install, updating and troubleshooting:
   mirrors); top speed drops with health, 0 health = wrecked; dents show per panel.
 * **Mirrors** — functional low-res SubViewport mirrors (left, right, rear) with
   a battery-saver refresh mode; smashed mirrors crack and stop rendering.
+* **Look** — see-through bus with a full interior (dashboard, wheel, seats,
+  upper deck), ACES tone mapping, soft shadows, haze, textured roads,
+  procedural building facades with lit windows at night, street lights,
+  broadleaf and pine trees, detailed traffic cars. All procedural: no image assets.
 * **Save** — local JSON in `user://`, atomic writes, defensive loading.
 
 ## Controls
@@ -61,7 +69,7 @@ with USB/ADB install, updating and troubleshooting:
 | `tests/unit/` | Pure-logic tests: no scene tree or physics required. |
 | `tests/integration/` | Several real nodes working together in a live tree and physics world. |
 | `tests/system/` | End-to-end: the real game is booted and played with simulated input. |
-| `tools/` | `run_tests.sh`, `lint.sh`, `export_android.sh` — used locally and in CI/CD. |
+| `tools/` | `run_tests.sh`, `lint.sh`, `export_android.sh` (local + CI/CD), `screenshots.gd` (renders views). |
 | `.github/workflows/` | CI (lint + test pyramid) and CD (Android APK export, releases). |
 
 ## Running tests locally

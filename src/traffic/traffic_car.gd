@@ -42,24 +42,67 @@ func _build() -> void:
 	shape.shape = box
 	shape.position.y = 0.3 + (HEIGHT - 0.3) / 2.0
 	add_child(shape)
-	var body := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(WIDTH, 0.8, LENGTH)
+	_build_visuals()
+
+
+## Car shape: painted lower body, tinted glass cabin with a painted roof,
+## four wheels, bumpers and head/tail lights.
+func _build_visuals() -> void:
 	var paint := StandardMaterial3D.new()
 	paint.albedo_color = color
-	mesh.material = paint
-	body.mesh = mesh
-	body.position.y = 0.7
-	add_child(body)
-	var cabin := MeshInstance3D.new()
-	var cabin_mesh := BoxMesh.new()
-	cabin_mesh.size = Vector3(WIDTH * 0.9, 0.6, LENGTH * 0.5)
+	paint.metallic = 0.45
+	paint.roughness = 0.3
 	var glass := StandardMaterial3D.new()
-	glass.albedo_color = Color(0.15, 0.2, 0.28)
-	cabin_mesh.material = glass
-	cabin.mesh = cabin_mesh
-	cabin.position = Vector3(0, 1.3, -0.2)
-	add_child(cabin)
+	glass.albedo_color = Color(0.1, 0.13, 0.17)
+	glass.metallic = 0.6
+	glass.roughness = 0.08
+	var dark := StandardMaterial3D.new()
+	dark.albedo_color = Color(0.05, 0.05, 0.06)
+	dark.roughness = 0.7
+	var half := LENGTH / 2.0
+	_part(BoxMesh.new(), Vector3(WIDTH, 0.62, LENGTH), Vector3(0, 0.66, 0), paint)
+	_part(BoxMesh.new(), Vector3(WIDTH * 0.86, 0.5, LENGTH * 0.5), Vector3(0, 1.22, -0.25), glass)
+	_part(BoxMesh.new(), Vector3(WIDTH * 0.84, 0.06, LENGTH * 0.46), Vector3(0, 1.48, -0.25), paint)
+	for z in [half + 0.03, -half - 0.03]:
+		_part(BoxMesh.new(), Vector3(WIDTH + 0.02, 0.18, 0.08), Vector3(0, 0.45, z), dark)
+	var head := _glow(Color(1.0, 0.97, 0.88), 2.0)
+	var tail := _glow(Color(0.85, 0.05, 0.05), 1.5)
+	for side in [1.0, -1.0]:
+		_part(
+			BoxMesh.new(), Vector3(0.38, 0.14, 0.04), Vector3(side * 0.6, 0.78, half + 0.01), head
+		)
+		_part(
+			BoxMesh.new(), Vector3(0.38, 0.14, 0.04), Vector3(side * 0.6, 0.8, -half - 0.01), tail
+		)
+		for z in [half - 0.85, -half + 0.85]:
+			var tyre := CylinderMesh.new()
+			tyre.top_radius = 0.33
+			tyre.bottom_radius = 0.33
+			var wheel := _part(
+				tyre, Vector3.ZERO, Vector3(side * (WIDTH / 2.0 - 0.12), 0.33, z), dark
+			)
+			tyre.height = 0.24
+			wheel.rotation = Vector3(0, 0, PI / 2.0)
+
+
+func _part(mesh: PrimitiveMesh, size: Vector3, at: Vector3, material: Material) -> MeshInstance3D:
+	if mesh is BoxMesh:
+		(mesh as BoxMesh).size = size
+	mesh.material = material
+	var instance := MeshInstance3D.new()
+	instance.mesh = mesh
+	instance.position = at
+	add_child(instance)
+	return instance
+
+
+static func _glow(light_color: Color, energy: float) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = light_color
+	material.emission_enabled = true
+	material.emission = light_color
+	material.emission_energy_multiplier = energy
+	return material
 
 
 ## World-space velocity along the road.

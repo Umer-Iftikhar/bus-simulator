@@ -1,0 +1,161 @@
+class_name WorldLook
+extends RefCounted
+## Visual style of the world: lighting, sky and the textured materials used by
+## [GameWorld]. Everything is procedural (noise textures and one shader), so no
+## image assets ship with the game.
+
+const BUILDING_SHADER := preload("res://src/world/shaders/building.gdshader")
+
+
+static func environment(map: MapDef) -> Environment:
+	var sky_material := ProceduralSkyMaterial.new()
+	sky_material.sky_top_color = map.sky_top
+	sky_material.sky_horizon_color = map.sky_horizon
+	sky_material.ground_horizon_color = map.sky_horizon
+	sky_material.ground_bottom_color = map.ground_color.darkened(0.5)
+	sky_material.sun_angle_max = 25.0
+	sky_material.sky_energy_multiplier = 0.6 if map.night else 1.0
+	var sky := Sky.new()
+	sky.sky_material = sky_material
+	var env := Environment.new()
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_energy = 1.3 if map.night else 1.0
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.tonemap_exposure = 1.6 if map.night else 0.95
+	env.tonemap_white = 6.0
+	env.glow_enabled = true
+	env.glow_intensity = 0.9 if map.night else 0.35
+	env.glow_bloom = 0.05
+	env.glow_hdr_threshold = 1.2
+	env.adjustment_enabled = true
+	env.adjustment_saturation = 1.12
+	env.adjustment_contrast = 1.05
+	env.fog_enabled = true
+	env.fog_light_color = map.sky_horizon
+	env.fog_density = 0.004 if map.night else 0.0022
+	env.fog_aerial_perspective = 0.4
+	env.fog_sky_affect = 0.3
+	return env
+
+
+static func sun(map: MapDef) -> DirectionalLight3D:
+	var light := DirectionalLight3D.new()
+	light.name = "Sun"
+	light.rotation_degrees = Vector3(-map.sun_elevation, 35.0, 0.0)
+	# At night this is moonlight: weak, cool, but enough to read the road.
+	light.light_energy = 0.55 if map.night else 1.25
+	light.light_color = Color(0.6, 0.7, 1.0) if map.night else Color(1.0, 0.96, 0.88)
+	light.shadow_enabled = true
+	light.shadow_blur = 1.5
+	light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	light.directional_shadow_max_distance = 140.0
+	return light
+
+
+## A tileable grey-scale noise texture, generated once per material.
+static func noise_texture(frequency: float, seed_value: int, size := 256) -> NoiseTexture2D:
+	var noise := FastNoiseLite.new()
+	noise.seed = seed_value
+	noise.frequency = frequency
+	noise.fractal_octaves = 4
+	var texture := NoiseTexture2D.new()
+	texture.width = size
+	texture.height = size
+	texture.seamless = true
+	texture.noise = noise
+	return texture
+
+
+## Material with a subtle noisy texture, projected in world space so meshes
+## need no UVs. [param scale] is texture repeats per metre.
+static func textured(
+	color: Color,
+	roughness: float,
+	variation: float,
+	scale: float,
+	seed_value: int,
+	frequency := 0.03
+) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	var ramp := Gradient.new()
+	ramp.set_color(0, color.darkened(variation))
+	ramp.set_color(1, color.lightened(variation * 0.6))
+	var texture := noise_texture(frequency, seed_value)
+	texture.color_ramp = ramp
+	material.albedo_texture = texture
+	material.roughness = roughness
+	material.uv1_triplanar = true
+	material.uv1_world_triplanar = true
+	material.uv1_scale = Vector3.ONE * scale
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	return material
+
+
+static func asphalt() -> StandardMaterial3D:
+	# Fine grain: high-frequency noise, many repeats per metre, low contrast.
+	var material := textured(Color(0.16, 0.16, 0.17), 0.88, 0.18, 0.35, 7, 0.25)
+	material.roughness_texture = noise_texture(0.08, 9)
+	return material
+
+
+static func sidewalk() -> StandardMaterial3D:
+	return textured(Color(0.6, 0.59, 0.56), 0.92, 0.12, 0.4, 11, 0.2)
+
+
+static func kerb() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.72, 0.72, 0.7)
+	material.roughness = 0.85
+	return material
+
+
+static func ground(map: MapDef) -> StandardMaterial3D:
+	return textured(map.ground_color, 1.0, 0.18, 0.05, map.scenery_seed, 0.06)
+
+
+static func road_paint() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.92, 0.92, 0.86)
+	material.roughness = 0.6
+	return material
+
+
+static func water() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.08, 0.3, 0.45)
+	material.metallic = 0.4
+	material.roughness = 0.04
+	material.normal_enabled = true
+	material.normal_texture = noise_texture(0.05, 3)
+	material.normal_texture.as_normal_map = true
+	material.normal_scale = 0.4
+	material.uv1_triplanar = true
+	material.uv1_world_triplanar = true
+	material.uv1_scale = Vector3.ONE * 0.05
+	return material
+
+
+static func building(map: MapDef) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = BUILDING_SHADER
+	material.set_shader_parameter("night", 1.0 if map.night else 0.0)
+	return material
+
+
+static func plain(color: Color, roughness: float) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = roughness
+	return material
+
+
+static func glow(color: Color, energy: float) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.emission_enabled = true
+	material.emission = color
+	material.emission_energy_multiplier = energy
+	return material

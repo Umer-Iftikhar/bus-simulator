@@ -21,6 +21,8 @@ var building_spacing := 28.0
 var tree_chance := 0.3
 var tree_color := Color(0.2, 0.45, 0.2)
 var has_water := false
+## Pine trees instead of broadleaf trees.
+var conifers := false
 var sun_elevation := 50.0
 var night := false
 

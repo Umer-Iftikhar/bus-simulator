@@ -7,11 +7,21 @@ const GROUND_MARGIN := 250.0
 const ROAD_STEP := 2.0
 const SIDEWALK_WIDTH := 2.5
 const BUILDING_SETBACK := 5.0
+const KERB_HEIGHT := 0.12
+const STREET_LIGHT_SPACING := 45.0
+const STREET_LIGHT_HEIGHT := 6.5
 
 var map: MapDef
 var track: Track
 ## Footprints of generated buildings (for tests and traffic sanity checks).
 var building_rects: Array[Rect2] = []
+var street_light_count := 0
+## Where each street light stands (also kept for tests: headless renderers
+## do not store MultiMesh instance data).
+var street_light_positions: Array[Vector3] = []
+var _building_material: ShaderMaterial
+var _trunk_material: StandardMaterial3D
+var _leaf_materials: Array[StandardMaterial3D] = []
 
 
 static func create(map_def: MapDef) -> GameWorld:
@@ -27,38 +37,16 @@ func _build() -> void:
 	_build_environment()
 	_build_ground()
 	_build_road()
+	_build_street_lights()
 	_build_scenery()
 
 
 func _build_environment() -> void:
-	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = map.sky_top
-	sky_material.sky_horizon_color = map.sky_horizon
-	sky_material.ground_horizon_color = map.sky_horizon
-	sky_material.ground_bottom_color = map.ground_color.darkened(0.4)
-	var sky := Sky.new()
-	sky.sky_material = sky_material
-	var env := Environment.new()
-	env.background_mode = Environment.BG_SKY
-	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.35 if map.night else 1.0
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.fog_enabled = true
-	env.fog_light_color = map.sky_horizon
-	env.fog_density = 0.0015
 	var world_env := WorldEnvironment.new()
 	world_env.name = "Environment"
-	world_env.environment = env
+	world_env.environment = WorldLook.environment(map)
 	add_child(world_env)
-
-	var sun := DirectionalLight3D.new()
-	sun.name = "Sun"
-	sun.rotation_degrees = Vector3(-map.sun_elevation, 35.0, 0.0)
-	sun.light_energy = 0.25 if map.night else 1.1
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 120.0
-	add_child(sun)
+	add_child(WorldLook.sun(map))
 
 
 func _bounds() -> Rect2:
@@ -84,7 +72,7 @@ func _build_ground() -> void:
 	var mesh_instance := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
 	plane.size = bounds.size
-	plane.material = _material(map.ground_color, 0.95)
+	plane.material = WorldLook.ground(map)
 	mesh_instance.mesh = plane
 	mesh_instance.position = Vector3(center.x, 0.0, center.y)
 	ground.add_child(mesh_instance)
@@ -94,7 +82,7 @@ func _build_ground() -> void:
 		water.name = "Water"
 		var water_plane := PlaneMesh.new()
 		water_plane.size = Vector2(bounds.size.x * 3.0, bounds.size.y * 3.0)
-		water_plane.material = _material(Color(0.15, 0.4, 0.6), 0.1)
+		water_plane.material = WorldLook.water()
 		water.mesh = water_plane
 		water.position = Vector3(center.x, -0.4, center.y)
 		add_child(water)
@@ -105,11 +93,15 @@ func _build_road() -> void:
 	road.name = "Road"
 	add_child(road)
 	var half := track.half_width()
-	road.add_child(_strip("Asphalt", -half, half, 0.02, _material(Color(0.2, 0.2, 0.22), 0.9)))
-	var kerb := _material(Color(0.62, 0.62, 0.6), 0.9)
-	road.add_child(_strip("SidewalkRight", half, half + SIDEWALK_WIDTH, 0.12, kerb))
-	road.add_child(_strip("SidewalkLeft", -half - SIDEWALK_WIDTH, -half, 0.12, kerb))
-	var paint := _material(Color(0.95, 0.95, 0.9), 0.6)
+	road.add_child(_strip("Asphalt", -half, half, 0.02, WorldLook.asphalt()))
+	var pavement := WorldLook.sidewalk()
+	road.add_child(_strip("SidewalkRight", half, half + SIDEWALK_WIDTH, KERB_HEIGHT, pavement))
+	road.add_child(_strip("SidewalkLeft", -half - SIDEWALK_WIDTH, -half, KERB_HEIGHT, pavement))
+	var kerb := WorldLook.kerb()
+	kerb.cull_mode = BaseMaterial3D.CULL_DISABLED
+	road.add_child(_kerb_face("KerbRight", half, kerb))
+	road.add_child(_kerb_face("KerbLeft", -half, kerb))
+	var paint := WorldLook.road_paint()
 	var edge := half - Track.SHOULDER
 	road.add_child(_strip("EdgeRight", edge - 0.15, edge, 0.03, paint))
 	road.add_child(_strip("EdgeLeft", -edge, -edge + 0.15, 0.03, paint))
@@ -156,7 +148,85 @@ func _strip(
 	return instance
 
 
+## The vertical face of a kerb at [param lateral], from the road up to the sidewalk.
+func _kerb_face(face_name: String, lateral: float, material: Material) -> MeshInstance3D:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_material(material)
+	var length := track.length()
+	var offset := 0.0
+	while offset < length:
+		var end := minf(offset + ROAD_STEP, length)
+		var a := track.position_at(offset) + track.right_at(offset) * lateral
+		var b := track.position_at(end) + track.right_at(end) * lateral
+		var up := Vector3.UP * KERB_HEIGHT
+		st.set_normal(-track.right_at(offset) * signf(lateral))
+		for v in [a, b, a + up, a + up, b, b + up]:
+			st.add_vertex(v)
+		offset = end
+	var instance := MeshInstance3D.new()
+	instance.name = face_name
+	instance.mesh = st.commit()
+	return instance
+
+
+## Street lights along the kerb-side pavement, drawn as two MultiMeshes (poles
+## and lamp heads) to keep draw calls low on phones. Heads glow at night.
+func _build_street_lights() -> void:
+	var transforms: Array[Transform3D] = []
+	var lateral := track.half_width() + SIDEWALK_WIDTH - 0.4
+	var offset := STREET_LIGHT_SPACING / 2.0
+	while offset < track.length():
+		var forward := track.forward_at(offset)
+		var basis := Basis(Vector3.UP.cross(forward), Vector3.UP, forward)
+		transforms.append(
+			Transform3D(basis, track.position_at(offset) + track.right_at(offset) * lateral)
+		)
+		offset += STREET_LIGHT_SPACING
+	street_light_count = transforms.size()
+	for xform in transforms:
+		street_light_positions.append(xform.origin)
+	var pole := CylinderMesh.new()
+	pole.top_radius = 0.06
+	pole.bottom_radius = 0.1
+	pole.height = STREET_LIGHT_HEIGHT
+	pole.material = WorldLook.plain(Color(0.3, 0.31, 0.33), 0.5)
+	var head := BoxMesh.new()
+	head.size = Vector3(1.6, 0.14, 0.4)
+	if map.night:
+		head.material = WorldLook.glow(Color(1.0, 0.85, 0.6), 4.0)
+	else:
+		head.material = WorldLook.plain(Color(0.35, 0.36, 0.38), 0.5)
+	var lights := Node3D.new()
+	lights.name = "StreetLights"
+	add_child(lights)
+	# Poles stand at the pavement; heads overhang toward the road (-X in road space).
+	var pole_offset := Transform3D(Basis(), Vector3(0, STREET_LIGHT_HEIGHT / 2.0, 0))
+	var head_offset := Transform3D(Basis(), Vector3(0.7, STREET_LIGHT_HEIGHT, 0))
+	lights.add_child(_multimesh("Poles", pole, transforms, pole_offset))
+	lights.add_child(_multimesh("Heads", head, transforms, head_offset))
+
+
+func _multimesh(
+	mesh_name: String, mesh: Mesh, transforms: Array[Transform3D], local: Transform3D
+) -> MultiMeshInstance3D:
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = mesh
+	multimesh.instance_count = transforms.size()
+	for i in transforms.size():
+		multimesh.set_instance_transform(i, transforms[i] * local)
+	var instance := MultiMeshInstance3D.new()
+	instance.name = mesh_name
+	instance.multimesh = multimesh
+	return instance
+
+
 func _build_scenery() -> void:
+	_building_material = WorldLook.building(map)
+	_trunk_material = WorldLook.plain(Color(0.33, 0.23, 0.15), 1.0)
+	for shade in [-0.12, 0.0, 0.12]:
+		_leaf_materials.append(WorldLook.plain(map.tree_color.lightened(shade), 0.95))
 	var scenery := Node3D.new()
 	scenery.name = "Scenery"
 	add_child(scenery)
@@ -211,11 +281,14 @@ func _try_place_building(
 	shape.shape = box
 	body.add_child(shape)
 	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.name = "Facade"
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	var color: Color = map.building_colors[rng.randi_range(0, map.building_colors.size() - 1)]
-	mesh.material = _material(color, 0.85)
 	mesh_instance.mesh = mesh
+	mesh_instance.material_override = _building_material
+	mesh_instance.set_instance_shader_parameter("wall_color", color)
+	mesh_instance.set_instance_shader_parameter("building_seed", float(building_rects.size()))
 	body.add_child(mesh_instance)
 	parent.add_child(body)
 
@@ -234,23 +307,43 @@ func _try_place_tree(parent: Node3D, center: Vector3, clearance: float) -> void:
 	shape.shape = trunk_shape
 	shape.position.y = 1.5
 	tree.add_child(shape)
+	# Deterministic per-tree variation from its position.
+	var vary := absf(sin(center.x * 12.9898 + center.z * 78.233))
+	var scale := 0.8 + vary * 0.6
 	var trunk := MeshInstance3D.new()
 	var trunk_mesh := CylinderMesh.new()
-	trunk_mesh.top_radius = 0.25
-	trunk_mesh.bottom_radius = 0.35
-	trunk_mesh.height = 3.0
-	trunk_mesh.material = _material(Color(0.4, 0.28, 0.18), 1.0)
+	trunk_mesh.top_radius = 0.2
+	trunk_mesh.bottom_radius = 0.32
+	trunk_mesh.height = 3.0 * scale
+	trunk_mesh.material = _trunk_material
 	trunk.mesh = trunk_mesh
-	trunk.position.y = 1.5
+	trunk.position.y = 1.5 * scale
 	tree.add_child(trunk)
-	var crown := MeshInstance3D.new()
-	var crown_mesh := SphereMesh.new()
-	crown_mesh.radius = 2.0
-	crown_mesh.height = 3.6
-	crown_mesh.material = _material(map.tree_color, 1.0)
-	crown.mesh = crown_mesh
-	crown.position.y = 4.2
-	tree.add_child(crown)
+	var leaves := _leaf_materials[int(vary * 100.0) % _leaf_materials.size()]
+	if map.conifers:
+		for tier in 3:
+			var cone := MeshInstance3D.new()
+			var cone_mesh := CylinderMesh.new()
+			cone_mesh.top_radius = 0.0
+			cone_mesh.bottom_radius = (2.2 - tier * 0.55) * scale
+			cone_mesh.height = 3.0 * scale
+			cone_mesh.material = leaves
+			cone.mesh = cone_mesh
+			cone.position.y = (3.2 + tier * 1.6) * scale
+			tree.add_child(cone)
+	else:
+		for blob in 3:
+			var crown := MeshInstance3D.new()
+			var crown_mesh := SphereMesh.new()
+			crown_mesh.radius = (1.7 - blob * 0.3) * scale
+			crown_mesh.height = crown_mesh.radius * 1.8
+			crown_mesh.radial_segments = 16
+			crown_mesh.rings = 8
+			crown_mesh.material = leaves
+			crown.mesh = crown_mesh
+			var angle := blob * 2.1 + vary * 6.0
+			crown.position = Vector3(cos(angle) * 0.7, (3.6 + blob * 0.7) * scale, sin(angle) * 0.7)
+			tree.add_child(crown)
 	parent.add_child(tree)
 
 
@@ -260,10 +353,3 @@ func _clear_of_road(center: Vector3, radius: float, clearance: float) -> bool:
 	var nearest := track.position_at(track.closest_offset(center))
 	nearest.y = 0.0
 	return Vector3(center.x, 0.0, center.z).distance_to(nearest) - radius >= clearance - 0.01
-
-
-static func _material(color: Color, roughness: float) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = roughness
-	return material

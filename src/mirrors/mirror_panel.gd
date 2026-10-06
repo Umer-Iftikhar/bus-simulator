@@ -28,8 +28,10 @@ func _layout() -> void:
 	var left := views[MirrorRig.LEFT] as MirrorView
 	var right := views[MirrorRig.RIGHT] as MirrorView
 	var rear := views[MirrorRig.REAR] as MirrorView
-	left.position = Vector2(16, size.y * 0.42)
-	right.position = Vector2(size.x - right.size.x - 16, size.y * 0.42)
+	# Below the HUD text, above the indicator buttons / pedals.
+	var y := size.y * 0.3
+	left.position = Vector2(16, y)
+	right.position = Vector2(size.x - right.size.x - 16, y)
 	rear.position = Vector2((size.x - rear.size.x) / 2.0, 104)
 
 
