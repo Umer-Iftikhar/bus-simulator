@@ -6,6 +6,8 @@ extends Control
 signal camera_requested
 signal horn_requested
 signal menu_requested
+signal indicator_left_requested
+signal indicator_right_requested
 
 const MARGIN := 24.0
 
@@ -15,6 +17,8 @@ var brake_pedal := TouchPedal.new("BRAKE")
 var camera_button := TouchButton.new("CAM")
 var horn_button := TouchButton.new("HORN")
 var menu_button := TouchButton.new("MENU")
+var indicator_left_button := TouchButton.new("<", Vector2(96, 64))
+var indicator_right_button := TouchButton.new(">", Vector2(96, 64))
 
 
 func _init() -> void:
@@ -27,13 +31,26 @@ func _init() -> void:
 	camera_button.name = "CameraButton"
 	horn_button.name = "HornButton"
 	menu_button.name = "MenuButton"
+	indicator_left_button.name = "IndicatorLeft"
+	indicator_right_button.name = "IndicatorRight"
 	gas.base_color = Color(0.1, 0.45, 0.15, 0.55)
 	brake_pedal.base_color = Color(0.5, 0.1, 0.1, 0.55)
-	for control in [wheel, gas, brake_pedal, camera_button, horn_button, menu_button]:
+	for control in [
+		wheel,
+		gas,
+		brake_pedal,
+		camera_button,
+		horn_button,
+		menu_button,
+		indicator_left_button,
+		indicator_right_button,
+	]:
 		add_child(control)
 	camera_button.pressed_down.connect(camera_requested.emit)
 	horn_button.pressed_down.connect(horn_requested.emit)
 	menu_button.pressed_down.connect(menu_requested.emit)
+	indicator_left_button.pressed_down.connect(indicator_left_requested.emit)
+	indicator_right_button.pressed_down.connect(indicator_right_requested.emit)
 
 
 func _ready() -> void:
@@ -51,6 +68,16 @@ func _layout() -> void:
 	camera_button.position = Vector2(area.x - camera_button.size.x - MARGIN, MARGIN)
 	horn_button.position = Vector2(wheel.position.x + wheel.size.x + 18.0, area.y - 96.0)
 	menu_button.position = Vector2((area.x - menu_button.size.x) / 2.0, MARGIN)
+	var above_wheel := wheel.position.y - indicator_left_button.size.y - 14.0
+	indicator_left_button.position = Vector2(wheel.position.x, above_wheel)
+	indicator_right_button.position = Vector2(
+		wheel.position.x + wheel.size.x - indicator_right_button.size.x, above_wheel
+	)
+
+
+func show_indicators(left_on: bool, right_on: bool) -> void:
+	indicator_left_button.set_lit(left_on)
+	indicator_right_button.set_lit(right_on)
 
 
 func steer() -> float:

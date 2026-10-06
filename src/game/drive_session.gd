@@ -25,6 +25,7 @@ var player_input: PlayerInput
 var run: RunController
 var damage: DamageModel
 var traffic: TrafficManager
+var indicators := Indicators.new()
 var ui: CanvasLayer
 var hud: Hud
 var touch_controls: TouchControls
@@ -83,6 +84,12 @@ func _ready() -> void:
 	player_input.horn_requested.connect(horn.honk)
 	player_input.pause_requested.connect(exit_requested.emit)
 	camera_rig.mode_changed.connect(hud.show_camera_mode)
+	player_input.indicator_left_requested.connect(
+		func() -> void: indicators.toggle_left(current_lane())
+	)
+	player_input.indicator_right_requested.connect(
+		func() -> void: indicators.toggle_right(current_lane())
+	)
 	run.stop_served.connect(_on_stop_served)
 	run.stop_missed.connect(_on_stop_missed)
 	run.run_finished.connect(_on_run_finished)
@@ -99,6 +106,20 @@ func spawn_transform() -> Transform3D:
 	var xform := world.track.vehicle_transform(0, SPAWN_OFFSET)
 	xform.origin.y = 0.3
 	return xform
+
+
+## Lane the bus is in (-1 when off the road).
+func current_lane() -> int:
+	return world.track.lane_at(bus.global_position)
+
+
+func _physics_process(delta: float) -> void:
+	indicators.update(delta, current_lane())
+	var left := indicators.left_lamp()
+	var right := indicators.right_lamp()
+	bus.set_indicator_lamps(left, right)
+	touch_controls.show_indicators(left, right)
+	traffic.signal_lane = indicators.target_lane
 
 
 func _apply_performance(factors: Dictionary) -> void:

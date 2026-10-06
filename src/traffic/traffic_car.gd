@@ -14,6 +14,8 @@ var lane := 0
 var offset := 0.0
 var speed := 0.0
 var desired_speed := 11.0
+## True while the car is dropping back to let the signalling bus in.
+var yielding := false
 var color := Color.WHITE
 
 

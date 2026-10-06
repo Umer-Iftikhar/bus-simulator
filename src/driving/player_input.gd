@@ -5,6 +5,8 @@ extends Node
 signal camera_requested
 signal horn_requested
 signal pause_requested
+signal indicator_left_requested
+signal indicator_right_requested
 
 var bus: Bus
 var touch: TouchControls
@@ -20,6 +22,8 @@ func _ready() -> void:
 		touch.camera_requested.connect(camera_requested.emit)
 		touch.horn_requested.connect(horn_requested.emit)
 		touch.menu_requested.connect(pause_requested.emit)
+		touch.indicator_left_requested.connect(indicator_left_requested.emit)
+		touch.indicator_right_requested.connect(indicator_right_requested.emit)
 
 
 func _physics_process(_delta: float) -> void:
@@ -43,3 +47,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		horn_requested.emit()
 	elif event.is_action_pressed("pause"):
 		pause_requested.emit()
+	elif event.is_action_pressed("indicator_left"):
+		indicator_left_requested.emit()
+	elif event.is_action_pressed("indicator_right"):
+		indicator_right_requested.emit()
