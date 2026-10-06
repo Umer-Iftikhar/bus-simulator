@@ -1,0 +1,30 @@
+name: Setup Godot
+description: Downloads (and caches) the headless-capable Godot editor binary and exports GODOT.
+inputs:
+  version:
+    description: Godot release tag, e.g. 4.4-stable
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Cache Godot binary
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/godot-bin
+        key: godot-${{ runner.os }}-${{ inputs.version }}
+    - name: Download Godot ${{ inputs.version }}
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p ~/godot-bin && cd ~/godot-bin
+        name="Godot_v${{ inputs.version }}_linux.x86_64"
+        curl -fsSL -o godot.zip \
+          "https://github.com/godotengine/godot/releases/download/${{ inputs.version }}/${name}.zip"
+        unzip -q godot.zip && rm godot.zip
+        mv "$name" godot && chmod +x godot
+    - name: Export GODOT
+      shell: bash
+      run: |
+        echo "GODOT=$HOME/godot-bin/godot" >> "$GITHUB_ENV"
+        "$HOME/godot-bin/godot" --version
