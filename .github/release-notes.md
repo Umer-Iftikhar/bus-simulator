@@ -1,6 +1,6 @@
 ## 📱 Install on Android
 
-1. On your phone, sign in to GitHub in the browser (this repository is private) and open this page.
+1. Open this page in your phone's browser (no GitHub account needed).
 2. Under **Assets** below, tap the `.apk` file to download it.
 3. Open the downloaded file, allow your browser / Files app to **install unknown apps**, then tap **Install**
    (if Google Play Protect warns, choose **More details → Install anyway**).

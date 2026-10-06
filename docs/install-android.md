@@ -13,9 +13,9 @@ It is not on the Play Store, so you install it directly ("sideloading").
 ## Option A — download straight to the phone
 
 1. **Open the Releases page on your phone.**
-   The repository is private, so first sign in to GitHub in your phone's browser
-   (Chrome) with an account that has access to the repository.
-   Then open: <https://github.com/Umer-Iftikhar/bus-simulator/releases/latest>
+   In your phone's browser (e.g. Chrome) open
+   <https://github.com/Umer-Iftikhar/bus-simulator/releases/latest>.
+   No GitHub account or sign-in is needed.
 2. **Download the APK.** Under **Assets**, tap
    `bus-simulator-<version>-debug.apk`. If Chrome warns that the file may be
    harmful, tap **Download anyway**.
@@ -68,7 +68,7 @@ Long-press the **Bus Simulator** icon → **App info** → **Uninstall**, or
 
 | Problem | Fix |
 |---|---|
-| The Releases page shows **404** | You are not signed in to GitHub in the browser, or your account has no access to the private repository. |
+| The Releases page shows **404** | Check the link is exactly `github.com/Umer-Iftikhar/bus-simulator/releases/latest`. |
 | **"App not installed"** | Uninstall the existing Bus Simulator first (see the note above), make sure you have free space, then try again. |
 | **"There was a problem parsing the package"** | The download was incomplete — download the APK again. Also check the phone runs Android 7.0+ and is 64-bit. |
 | Nothing happens when tapping the APK | Open it from the **Files** app instead of the browser, and check *Install unknown apps* is allowed for that app. |

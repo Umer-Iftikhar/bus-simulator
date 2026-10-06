@@ -8,8 +8,8 @@ The full design lives in [docs/game-design.md](docs/game-design.md).
 
 ## Install on your Android phone
 
-1. On the phone, sign in to GitHub in your browser (the repository is private),
-   then open the **[latest release](https://github.com/Umer-Iftikhar/bus-simulator/releases/latest)**.
+1. On the phone, open the **[latest release](https://github.com/Umer-Iftikhar/bus-simulator/releases/latest)**
+   in your browser (no GitHub account needed).
 2. Under **Assets**, tap `bus-simulator-<version>-debug.apk` to download it.
 3. Open the downloaded file. When asked, allow your browser / Files app to
    **install unknown apps**, then tap **Install** (if Play Protect warns, choose
