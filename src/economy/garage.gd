@@ -65,17 +65,24 @@ func buy_upgrade(bus_id: String, kind: Catalog.Upgrade) -> Result:
 
 ## Buys (or, if already bought for this bus, re-applies for free) a paint job.
 func buy_paint(bus_id: String, paint_id: String) -> Result:
+	return buy_cosmetic(bus_id, "paint", paint_id)
+
+
+## Buys and applies a cosmetic item; items already bought for this bus are
+## re-applied for free.
+func buy_cosmetic(bus_id: String, category: String, item_id: String) -> Result:
 	if not save.owns(bus_id):
 		return Result.NOT_OWNED
-	var entry := Catalog.paint_entry(paint_id)
+	var entry := Catalog.cosmetic_entry(category, item_id)
 	if entry.is_empty():
 		return Result.UNKNOWN_ITEM
 	var bus: Dictionary = save.owned[bus_id]
-	if not bus["paints"].has(paint_id):
+	var bought: Array = bus["owned_cosmetics"][category]
+	if not bought.has(item_id):
 		if not save.wallet.spend(entry["price"]):
 			return Result.CANT_AFFORD
-		bus["paints"].append(paint_id)
-	bus["paint"] = paint_id
+		bought.append(item_id)
+	bus["cosmetics"][category] = item_id
 	return Result.OK
 
 

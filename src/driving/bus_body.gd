@@ -9,8 +9,6 @@ extends Node3D
 
 const PANEL := 0.06
 const ROOF := 0.14
-## Belt line (bottom of the windows) as a fraction of the body height.
-const BELT := 0.38
 const PILLAR_SPACING := 1.5
 const SEAT_PITCH := 0.85
 const WINDSCREEN_BELOW_EYE := 0.85
@@ -27,10 +25,16 @@ var spec: BusSpec
 var clearance := 0.55
 var paint_material := StandardMaterial3D.new()
 var glass_material := StandardMaterial3D.new()
+## The windscreen is never tinted (legal requirement, and the driver must see out).
+var windscreen_material := StandardMaterial3D.new()
 var trim_material := StandardMaterial3D.new()
 var painted: Array[MeshInstance3D] = []
 var glass: Array[MeshInstance3D] = []
 var seats: MultiMeshInstance3D
+var roof: MeshInstance3D
+var roof_material := StandardMaterial3D.new()
+var stripe_material := StandardMaterial3D.new()
+var stripes: Array[MeshInstance3D] = []
 var head_material := _emissive(Color(1.0, 0.98, 0.9), 0.6)
 var tail_material := _emissive(Color(0.9, 0.05, 0.05), 0.4)
 var reverse_material := _emissive(Color(1.0, 1.0, 1.0), 0.0)
@@ -58,7 +62,12 @@ static func create(bus_spec: BusSpec, body_clearance: float) -> BusBody:
 
 ## Height of the window bottoms (bus-local).
 func belt_line() -> float:
-	return clearance + (spec.height - clearance) * BELT
+	return clearance + (spec.height - clearance) * spec.belt_fraction()
+
+
+## Z of the cab front (the windscreen base); behind the bonnet on a minibus.
+func front_z() -> float:
+	return spec.length / 2.0 - spec.cab_offset()
 
 
 ## Bottom of the windscreen: never above the side windows, and always well
@@ -76,6 +85,7 @@ func _build() -> void:
 	glass_material.metallic = 0.15
 	glass_material.roughness = 0.05
 	glass_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	windscreen_material = glass_material.duplicate()
 	trim_material.albedo_color = Color(0.06, 0.06, 0.07)
 	trim_material.roughness = 0.6
 	_build_shell()
@@ -90,10 +100,13 @@ func _build_shell() -> void:
 	var hw := w / 2.0
 	var c := clearance
 	var yb := belt_line()
+	var front := front_z()
 	var window_h := h - ROOF - yb
 	var window_y := yb + window_h / 2.0
 	var lower_h := yb - c
 	var lower_y := c + lower_h / 2.0
+	var cabin_length := front + hl
+	var cabin_mid := (front - hl) / 2.0
 
 	_paint_box(
 		"SkirtLeft", Vector3(PANEL, lower_h, spec.length), Vector3(hw - PANEL / 2, lower_y, 0)
@@ -102,11 +115,32 @@ func _build_shell() -> void:
 		"SkirtRight", Vector3(PANEL, lower_h, spec.length), Vector3(-hw + PANEL / 2, lower_y, 0)
 	)
 	var wb := windscreen_bottom()
-	_paint_box("FrontPanel", Vector3(w, wb - c, PANEL), Vector3(0, (c + wb) / 2.0, hl - PANEL / 2))
-	_paint_box("RearPanel", Vector3(w, lower_h, PANEL), Vector3(0, lower_y, -hl + PANEL / 2))
-	_paint_box("Roof", Vector3(w, ROOF, spec.length), Vector3(0, h - ROOF / 2.0, 0))
-	if h > 4.0:
-		# Double decker: painted band between the decks.
+	if spec.cab_offset() > 0.0:
+		# Van-style bonnet: grille at the very front, bonnet up to the belt line.
+		_paint_box("FrontPanel", Vector3(w, yb - c, PANEL), Vector3(0, lower_y, hl - PANEL / 2))
+		_paint_box(
+			"Hood",
+			Vector3(w, 0.08, spec.cab_offset()),
+			Vector3(0, yb - 0.04, hl - spec.cab_offset() / 2.0)
+		)
+		_trim_box("Grille", Vector3(w * 0.55, 0.28, 0.02), Vector3(0, c + 0.55, hl + 0.005))
+		_paint_box(
+			"CabFront", Vector3(w, wb - c, PANEL), Vector3(0, (c + wb) / 2.0, front - PANEL / 2)
+		)
+	else:
+		_paint_box(
+			"FrontPanel", Vector3(w, wb - c, PANEL), Vector3(0, (c + wb) / 2.0, hl - PANEL / 2)
+		)
+	var rear_height := h - c if spec.style == "coach" else lower_h
+	_paint_box(
+		"RearPanel",
+		Vector3(w, rear_height, PANEL),
+		Vector3(0, c + rear_height / 2.0, -hl + PANEL / 2)
+	)
+	roof = _paint_box_ret(
+		"Roof", Vector3(w, ROOF, cabin_length), Vector3(0, h - ROOF / 2.0, cabin_mid)
+	)
+	if spec.style == "double_decker":
 		var band_y := c + (h - c) * 0.56
 		for side in [1.0, -1.0]:
 			_paint_box(
@@ -115,30 +149,54 @@ func _build_shell() -> void:
 				Vector3(side * (hw - PANEL / 2), band_y, 0)
 			)
 		_paint_box(
-			"DeckBandFront", Vector3(w, 0.32, PANEL + 0.01), Vector3(0, band_y, hl - PANEL / 2)
+			"DeckBandFront", Vector3(w, 0.32, PANEL + 0.01), Vector3(0, band_y, front - PANEL / 2)
 		)
+	if spec.style == "coach":
+		# Luggage bay doors along the lower sides.
+		for side in [1.0, -1.0]:
+			var z := -hl + 1.6
+			var bay := 0
+			while z < front - 2.5:
+				_trim_box(
+					"LuggageDoor%d" % bay,
+					Vector3(0.015, lower_h * 0.62, 0.03),
+					Vector3(side * (hw + 0.008), c + lower_h * 0.42, z)
+				)
+				z += 1.9
+				bay += 1
 
+	var glass_length := cabin_length - 0.1
 	_glass_box(
-		"GlassLeft", Vector3(0.02, window_h, spec.length - 0.1), Vector3(hw - 0.03, window_y, 0)
+		"GlassLeft", Vector3(0.02, window_h, glass_length), Vector3(hw - 0.03, window_y, cabin_mid)
 	)
 	_glass_box(
-		"GlassRight", Vector3(0.02, window_h, spec.length - 0.1), Vector3(-hw + 0.03, window_y, 0)
+		"GlassRight",
+		Vector3(0.02, window_h, glass_length),
+		Vector3(-hw + 0.03, window_y, cabin_mid)
 	)
 	var screen_h := h - ROOF - wb
-	_glass_box(
-		"Windscreen", Vector3(w - 0.06, screen_h, 0.02), Vector3(0, wb + screen_h / 2.0, hl - 0.03)
+	var rake := spec.windscreen_rake()
+	var screen := _glass_box_ret(
+		"Windscreen",
+		Vector3(w - 0.06, screen_h / cos(rake), 0.02),
+		Vector3(0, wb + screen_h / 2.0, front - 0.03 - screen_h / 2.0 * tan(rake))
 	)
-	_glass_box("RearWindow", Vector3(w - 0.06, window_h, 0.02), Vector3(0, window_y, -hl + 0.03))
+	screen.rotation.x = -rake
+	screen.material_override = windscreen_material
+	if spec.style != "coach":
+		_glass_box(
+			"RearWindow", Vector3(w - 0.06, window_h, 0.02), Vector3(0, window_y, -hl + 0.03)
+		)
 
 	# Pillars: corner posts plus regular posts along both sides.
 	for side in [1.0, -1.0]:
-		for z in [hl - 0.05, -hl + 0.05]:
+		for z in [front - 0.05, -hl + 0.05]:
 			_trim_box(
 				"CornerPillar",
 				Vector3(0.1, window_h, 0.1),
 				Vector3(side * (hw - 0.05), window_y, z)
 			)
-		var z_pos := hl - 1.6
+		var z_pos := front - 1.6
 		while z_pos > -hl + 0.8:
 			_trim_box(
 				"Pillar",
@@ -146,6 +204,17 @@ func _build_shell() -> void:
 				Vector3(side * (hw - 0.03), window_y, z_pos)
 			)
 			z_pos -= PILLAR_SPACING
+	# Livery stripe just below the windows (hidden until bought).
+	var stripe_y := yb - 0.18
+	for side in [1.0, -1.0]:
+		_stripe_box(
+			"StripeSide",
+			Vector3(0.012, 0.16, spec.length),
+			Vector3(side * (hw + 0.006), stripe_y, 0)
+		)
+	_stripe_box(
+		"StripeFront", Vector3(w, 0.16, 0.012), Vector3(0, minf(stripe_y, wb - 0.12), hl + 0.006)
+	)
 
 
 func _build_details() -> void:
@@ -185,7 +254,7 @@ func _build_details() -> void:
 	quad.size = Vector2(spec.width * 0.7, 0.18)
 	sign.mesh = quad
 	sign.material_override = trim_material
-	sign.position = Vector3(0, sign_y, hl + 0.002)
+	sign.position = Vector3(0, sign_y, front_z() + 0.002)
 	add_child(sign)
 	var label := Label3D.new()
 	label.name = "DestinationText"
@@ -195,7 +264,7 @@ func _build_details() -> void:
 	label.modulate = Color(1.0, 0.65, 0.1)
 	label.shaded = false
 	label.double_sided = false
-	label.position = Vector3(0, sign_y, hl + 0.006)
+	label.position = Vector3(0, sign_y, front_z() + 0.006)
 	add_child(label)
 	# Roof air-conditioning unit.
 	var ac := StandardMaterial3D.new()
@@ -270,7 +339,7 @@ func _build_cockpit(eye: Vector3, yb: float) -> void:
 	var hl := spec.length / 2.0
 	var dash_top := eye.y - DASH_BELOW_EYE
 	var dash_back := eye.z + DASH_AHEAD_OF_EYE
-	var dash_front := hl - 0.12
+	var dash_front := front_z() - 0.12
 	var dash_bottom := yb - 0.3
 	var dash := StandardMaterial3D.new()
 	dash.albedo_color = Color(0.13, 0.13, 0.14)
@@ -447,6 +516,49 @@ func _box(box_name: String, size: Vector3, at: Vector3, material: Material) -> M
 
 func _paint_box(box_name: String, size: Vector3, at: Vector3) -> void:
 	painted.append(_box(box_name, size, at, paint_material))
+
+
+func _paint_box_ret(box_name: String, size: Vector3, at: Vector3) -> MeshInstance3D:
+	var instance := _box(box_name, size, at, paint_material)
+	painted.append(instance)
+	return instance
+
+
+func _glass_box_ret(box_name: String, size: Vector3, at: Vector3) -> MeshInstance3D:
+	_glass_box(box_name, size, at)
+	return glass[-1]
+
+
+func _stripe_box(box_name: String, size: Vector3, at: Vector3) -> void:
+	var stripe := _box(box_name, size, at, stripe_material)
+	stripe.visible = false
+	stripes.append(stripe)
+
+
+## Livery stripe colour, or null for none.
+func set_stripe(color: Variant) -> void:
+	for stripe in stripes:
+		stripe.visible = color != null
+	if color != null:
+		stripe_material.albedo_color = color
+		stripe_material.metallic = 0.3
+		stripe_material.roughness = 0.35
+
+
+## Roof colour, or null to match the body paint.
+func set_roof(color: Variant) -> void:
+	if color == null:
+		roof.material_override = paint_material
+		return
+	roof_material.albedo_color = color
+	roof_material.roughness = 0.4
+	roof.material_override = roof_material
+
+
+## Window tint: higher [param darkness] (0..1) makes glass darker and more opaque.
+func set_tint(darkness: float) -> void:
+	var d := clampf(darkness, 0.0, 1.0)
+	glass_material.albedo_color = Color(0.5, 0.58, 0.62, 0.14).lerp(Color(0.04, 0.05, 0.06, 0.6), d)
 
 
 func _glass_box(box_name: String, size: Vector3, at: Vector3) -> void:

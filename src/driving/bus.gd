@@ -42,6 +42,8 @@ var handling_factor := 1.0
 var controls_enabled := true
 ## Visual shell (panels, glass, interior).
 var body: BusBody
+## Shared by every wheel hub so a rim upgrade updates all four.
+var rim_material := StandardMaterial3D.new()
 ## Gearbox: false = Drive, true = Reverse.
 var reverse_gear := false
 var headlights_on := false
@@ -93,6 +95,7 @@ func _build() -> void:
 	shape.position = Vector3(0, BODY_CLEARANCE + body_height / 2.0, 0)
 	add_child(shape)
 
+	set_rims(Color(0.75, 0.76, 0.78), 0.8, 0.3)
 	body = BusBody.create(spec, BODY_CLEARANCE)
 	add_child(body)
 	set_paint(spec.color)
@@ -132,7 +135,7 @@ func door_closed_position() -> Vector3:
 	return Vector3(
 		-spec.width / 2.0 - 0.04,
 		BODY_CLEARANCE + body_height * 0.42,
-		spec.length / 2.0 - 0.6 - DOOR_WIDTH / 2.0
+		spec.length / 2.0 - spec.cab_offset() - 0.6 - DOOR_WIDTH / 2.0
 	)
 
 
@@ -217,7 +220,8 @@ func _update_lights() -> void:
 static func mirror_mount(bus_spec: BusSpec, part: String) -> Vector3:
 	var side := 1.0 if part == DamageModel.MIRROR_LEFT else -1.0
 	var x := side * (bus_spec.width / 2.0 + MIRROR_REACH - MIRROR_HEAD.x / 2.0)
-	return Vector3(x, bus_spec.height * 0.68, bus_spec.length / 2.0 - 0.35)
+	var cab_front := bus_spec.length / 2.0 - bus_spec.cab_offset()
+	return Vector3(x, bus_spec.height * 0.68, cab_front - 0.35)
 
 
 ## Side mirrors: an arm and head on each front corner, plus a sensor that
@@ -419,11 +423,7 @@ func _add_wheel(wheel_name: String, at: Vector3, steering: bool, traction: bool)
 	hub_mesh.top_radius = WHEEL_RADIUS * 0.55
 	hub_mesh.bottom_radius = WHEEL_RADIUS * 0.55
 	hub_mesh.height = 0.37
-	var steel := StandardMaterial3D.new()
-	steel.albedo_color = Color(0.75, 0.76, 0.78)
-	steel.metallic = 0.8
-	steel.roughness = 0.3
-	hub_mesh.material = steel
+	hub_mesh.material = rim_material
 	hub.mesh = hub_mesh
 	hub.rotation = Vector3(0, 0, PI / 2.0)
 	wheel.add_child(hub)
@@ -442,6 +442,26 @@ func set_command(throttle: float, brake_pedal: float, steer_target: float) -> vo
 	_target_brake = brake_pedal
 	_target_steer = steer_target
 	command_changed.emit()
+
+
+func set_rims(color: Color, metallic: float, roughness: float) -> void:
+	rim_material.albedo_color = color
+	rim_material.metallic = metallic
+	rim_material.roughness = roughness
+
+
+## Applies a full set of cosmetic choices ({category: item id}, see [Catalog]).
+func apply_cosmetics(choices: Dictionary) -> void:
+	var paint_id: String = choices.get("paint", "stock")
+	set_paint(Catalog.paint_color(spec.id, paint_id))
+	var stripe := Catalog.cosmetic_entry("stripe", choices.get("stripe", "none"))
+	body.set_stripe(stripe.get("color"))
+	var rims := Catalog.cosmetic_entry("rims", choices.get("rims", "steel"))
+	set_rims(rims["color"], rims["metallic"], rims["roughness"])
+	var tint := Catalog.cosmetic_entry("tint", choices.get("tint", "clear"))
+	body.set_tint(tint["darkness"])
+	var roof := Catalog.cosmetic_entry("roof", choices.get("roof", "body"))
+	body.set_roof(roof.get("color"))
 
 
 func set_paint(paint: Color) -> void:
