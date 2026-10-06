@@ -17,6 +17,8 @@ var length := 7.0
 var width := 2.3
 var height := 2.8
 var color := Color(0.95, 0.75, 0.2)
+## Body style: "minibus", "city", "double_decker" or "coach".
+var style := "city"
 
 
 static func from_dict(data: Dictionary) -> BusSpec:
@@ -33,6 +35,25 @@ func duplicate_spec() -> BusSpec:
 		if prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE:
 			copy.set(prop["name"], get(prop["name"]))
 	return copy
+
+
+## Length of the bonnet ahead of the cab (vans/minibuses); 0 for flat-fronted buses.
+func cab_offset() -> float:
+	return 0.9 if style == "minibus" else 0.0
+
+
+## Windscreen lean-back in radians (minibus and coach have raked screens).
+func windscreen_rake() -> float:
+	if style == "coach":
+		return 0.24
+	if style == "minibus":
+		return 0.3
+	return 0.0
+
+
+## Window bottoms as a fraction of body height (coaches sit high).
+func belt_fraction() -> float:
+	return 0.47 if style == "coach" else 0.38
 
 
 func wheelbase() -> float:

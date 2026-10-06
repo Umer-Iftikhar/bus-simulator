@@ -10,6 +10,7 @@ extends Node3D
 ##   "traffic": bool, spawn AI traffic (default true)
 ##   "mirror_refresh": int, render mirrors every Nth frame (default 1)
 ##   "graphics": GraphicsSettings preset name (overrides mirror_refresh)
+##   "cosmetics": {category: item id} visual customisation
 
 signal run_finished(result: Dictionary)
 signal exit_requested
@@ -54,6 +55,8 @@ func _ready() -> void:
 	bus = Bus.create(spec)
 	add_child(bus)
 	bus.global_transform = spawn_transform()
+	if options.has("cosmetics"):
+		bus.apply_cosmetics(options["cosmetics"])
 	_apply_performance(options.get("performance", {}))
 	horn = Horn.new()
 	bus.add_child(horn)

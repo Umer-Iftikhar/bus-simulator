@@ -9,7 +9,8 @@ extends RefCounted
 const VERSION := 1
 
 var wallet := Wallet.new()
-## bus_id -> {"upgrades": {key: level}, "paint": id, "paints": [ids], "damage": {}}
+## bus_id -> {"upgrades": {key: level}, "cosmetics": {category: id},
+##            "owned_cosmetics": {category: [ids]}, "damage": {part: health}}
 var owned := {}
 var selected_bus := Catalog.STARTER_BUS
 var selected_map := "harbor"
@@ -30,7 +31,12 @@ static func default_owned_bus() -> Dictionary:
 	var upgrades := {}
 	for kind in Catalog.UPGRADE_KEYS:
 		upgrades[Catalog.upgrade_key(kind)] = 0
-	return {"upgrades": upgrades, "paint": "stock", "paints": ["stock"], "damage": {}}
+	var chosen := {}
+	var bought := {}
+	for category in Catalog.cosmetic_categories():
+		chosen[category] = Catalog.cosmetic_default(category)
+		bought[category] = [Catalog.cosmetic_default(category)]
+	return {"upgrades": upgrades, "cosmetics": chosen, "owned_cosmetics": bought, "damage": {}}
 
 
 func graphics() -> String:
@@ -56,7 +62,27 @@ func upgrade_level(bus_id: String, kind: Catalog.Upgrade) -> int:
 
 
 func paint(bus_id: String) -> String:
-	return owned[bus_id]["paint"] if owns(bus_id) else "stock"
+	return cosmetic(bus_id, "paint")
+
+
+## The item applied in [param category] on [param bus_id] (the default if not owned).
+func cosmetic(bus_id: String, category: String) -> String:
+	if not owns(bus_id):
+		return Catalog.cosmetic_default(category)
+	return owned[bus_id]["cosmetics"].get(category, Catalog.cosmetic_default(category))
+
+
+func cosmetics(bus_id: String) -> Dictionary:
+	var choices := {}
+	for category in Catalog.cosmetic_categories():
+		choices[category] = cosmetic(bus_id, category)
+	return choices
+
+
+func owns_cosmetic(bus_id: String, category: String, item_id: String) -> bool:
+	if not owns(bus_id):
+		return false
+	return owned[bus_id]["owned_cosmetics"].get(category, []).has(item_id)
 
 
 func damage(bus_id: String) -> Dictionary:
@@ -110,13 +136,27 @@ static func _sanitize_owned(raw: Dictionary) -> Dictionary:
 	if upgrades is Dictionary:
 		for key in clean["upgrades"]:
 			clean["upgrades"][key] = clampi(int(upgrades.get(key, 0)), 0, Catalog.MAX_UPGRADE_LEVEL)
-	var paints = raw.get("paints", [])
-	if paints is Array:
-		for paint_id in paints:
-			if Catalog.paint_ids().has(str(paint_id)) and not clean["paints"].has(str(paint_id)):
-				clean["paints"].append(str(paint_id))
-	var paint_id := str(raw.get("paint", "stock"))
-	clean["paint"] = paint_id if clean["paints"].has(paint_id) else "stock"
+	var raw_owned = raw.get("owned_cosmetics", {})
+	var raw_chosen = raw.get("cosmetics", {})
+	if not raw_owned is Dictionary:
+		raw_owned = {}
+	if not raw_chosen is Dictionary:
+		raw_chosen = {}
+	# Older saves stored paint as "paint" / "paints".
+	if raw.has("paints") and not raw_owned.has("paint"):
+		raw_owned["paint"] = raw["paints"]
+	if raw.has("paint") and not raw_chosen.has("paint"):
+		raw_chosen["paint"] = raw["paint"]
+	for category in Catalog.cosmetic_categories():
+		var valid := Catalog.cosmetic_ids(category)
+		var bought: Array = clean["owned_cosmetics"][category]
+		var listed = raw_owned.get(category, [])
+		if listed is Array:
+			for item_id in listed:
+				if valid.has(str(item_id)) and not bought.has(str(item_id)):
+					bought.append(str(item_id))
+		var chosen := str(raw_chosen.get(category, Catalog.cosmetic_default(category)))
+		clean["cosmetics"][category] = chosen if bought.has(chosen) else bought[0]
 	var raw_damage = raw.get("damage", {})
 	if raw_damage is Dictionary:
 		for part in raw_damage:

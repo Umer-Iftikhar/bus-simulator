@@ -4,7 +4,10 @@ extends TestCase
 ## hit any opaque part of the bus (an opaque windscreen once blocked the view).
 
 const YAW_LIMIT := 20.0
-const PITCH_MIN := -12.0
+## Relative to the camera (which already looks ~8 degrees down): the road from
+## about 16 degrees below the horizon upward must be clear. Steeper than that a
+## van-style bonnet legitimately fills the view.
+const PITCH_MIN := -8.0
 const PITCH_MAX := 4.0
 
 
@@ -99,8 +102,10 @@ func test_the_check_detects_an_opaque_windscreen() -> void:
 	opaque.albedo_color = Color.BLACK
 	pane.material_override = opaque
 	var blocked := _blockers(bus)
-	assert_gt(blocked.size(), 0)
-	assert_true(blocked[0].begins_with("Windscreen"), str(blocked))
+	var by_windscreen := Array(blocked).filter(
+		func(b: String) -> bool: return b.begins_with("Windscreen")
+	)
+	assert_gt(by_windscreen.size(), 5, str(blocked))
 
 
 func test_driver_eye_is_inside_the_cab_for_every_bus() -> void:

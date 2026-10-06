@@ -19,8 +19,8 @@ func test_round_trip_through_json_preserves_everything() -> void:
 	save.wallet.earn(1234)
 	save.owned["city"] = SaveData.default_owned_bus()
 	save.owned["city"]["upgrades"]["brakes"] = 3
-	save.owned["city"]["paints"].append("ocean")
-	save.owned["city"]["paint"] = "ocean"
+	save.owned["city"]["owned_cosmetics"]["paint"].append("ocean")
+	save.owned["city"]["cosmetics"]["paint"] = "ocean"
 	save.owned["city"]["damage"] = {"mirror_left": 0.0, "body_front": 0.6}
 	save.selected_bus = "city"
 	save.stats["runs"] = 7
@@ -71,7 +71,7 @@ func test_owned_bus_fields_are_sanitized() -> void:
 	assert_eq(loaded.upgrade_level("minibus", Catalog.Upgrade.TOP_SPEED), Catalog.MAX_UPGRADE_LEVEL)
 	assert_eq(loaded.upgrade_level("minibus", Catalog.Upgrade.BRAKES), 0)
 	assert_false(loaded.owned["minibus"]["upgrades"].has("warp_drive"))
-	assert_eq(loaded.owned["minibus"]["paints"], ["stock", "ocean"])
+	assert_eq(loaded.owned["minibus"]["owned_cosmetics"]["paint"], ["stock", "ocean"])
 	assert_eq(loaded.paint("minibus"), "stock", "unowned paint not applied")
 	assert_eq(loaded.damage("minibus"), {"body_front": 1.0, "mirror_left": 0.0})
 
@@ -110,3 +110,37 @@ func test_old_battery_saver_mirror_setting_migrates_to_low_graphics() -> void:
 	assert_eq(loaded.graphics(), "low")
 	var high := SaveData.from_dict({"settings": {"mirror_quality": "high"}})
 	assert_eq(high.graphics(), GraphicsSettings.DEFAULT)
+
+
+func test_cosmetics_round_trip_and_sanitize() -> void:
+	var save := SaveData.new_game()
+	save.owned["minibus"]["owned_cosmetics"]["rims"].append("gold")
+	save.owned["minibus"]["cosmetics"]["rims"] = "gold"
+	var loaded := SaveData.from_dict(JSON.parse_string(JSON.stringify(save.to_dict())))
+	assert_eq(loaded.cosmetic("minibus", "rims"), "gold")
+	var odd := (
+		SaveData
+		. from_dict(
+			{
+				"owned":
+				{
+					"minibus":
+					{
+						"cosmetics": {"rims": "spinners", "tint": "dark", "wings": "big"},
+						"owned_cosmetics": {"rims": ["spinners"], "tint": ["dark"]},
+					}
+				}
+			}
+		)
+	)
+	assert_eq(odd.cosmetic("minibus", "rims"), "steel", "unknown item dropped")
+	assert_eq(odd.cosmetic("minibus", "tint"), "dark", "valid owned item kept")
+	assert_false(odd.owned["minibus"]["cosmetics"].has("wings"))
+
+
+func test_old_paint_fields_migrate_into_cosmetics() -> void:
+	var old := {"owned": {"minibus": {"paint": "ocean", "paints": ["stock", "ocean"]}}}
+	var loaded := SaveData.from_dict(old)
+	assert_eq(loaded.paint("minibus"), "ocean")
+	assert_true(loaded.owns_cosmetic("minibus", "paint", "ocean"))
+	assert_eq(loaded.cosmetic("minibus", "stripe"), "none")

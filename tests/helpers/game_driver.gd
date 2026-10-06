@@ -51,6 +51,14 @@ func to_window(canvas_point: Vector2) -> Vector2:
 
 
 func click(control: Control) -> void:
+	# Like a player, scroll the control into view first if it sits in a list.
+	var parent := control.get_parent()
+	while parent != null:
+		if parent is ScrollContainer:
+			(parent as ScrollContainer).ensure_control_visible(control)
+			await test.wait_process_frames(2)
+			break
+		parent = parent.get_parent()
 	var at := to_window(control.get_global_rect().get_center())
 	for pressed in [true, false]:
 		var event := InputEventMouseButton.new()

@@ -46,4 +46,5 @@ static func camera_transform(mode: Mode, bus_xform: Transform3D, spec: BusSpec) 
 ## Drivers sit low at the front, even in a double decker.
 static func driver_seat(spec: BusSpec) -> Vector3:
 	var eye_height := minf(spec.height * 0.78, DRIVER_EYE_MAX)
-	return Vector3(spec.width / 2.0 - 0.6, eye_height, spec.length / 2.0 - 1.25)
+	var cab_front := spec.length / 2.0 - spec.cab_offset()
+	return Vector3(spec.width / 2.0 - 0.6, eye_height, cab_front - 1.25)

@@ -145,3 +145,37 @@ func test_store_damage_saves_only_damaged_parts() -> void:
 	assert_eq(save.damage("minibus").keys(), [DamageModel.BODY_LEFT])
 	garage.store_damage("coach", model)
 	assert_false(save.owns("coach"), "storing damage never grants a bus")
+
+
+func test_cosmetics_start_at_defaults() -> void:
+	for category in Catalog.cosmetic_categories():
+		assert_eq(save.cosmetic("minibus", category), Catalog.cosmetic_default(category))
+		assert_true(save.owns_cosmetic("minibus", category, Catalog.cosmetic_default(category)))
+
+
+func test_buy_cosmetic_charges_once_then_reapplies_free() -> void:
+	save.wallet.earn(2000)
+	var price: int = Catalog.cosmetic_entry("rims", "chrome")["price"]
+	assert_eq(garage.buy_cosmetic("minibus", "rims", "chrome"), Garage.Result.OK)
+	assert_eq(save.cosmetic("minibus", "rims"), "chrome")
+	assert_eq(save.money, 2000 - price)
+	garage.buy_cosmetic("minibus", "rims", "steel")
+	assert_eq(garage.buy_cosmetic("minibus", "rims", "chrome"), Garage.Result.OK)
+	assert_eq(save.money, 2000 - price, "already owned: free")
+
+
+func test_buy_cosmetic_failures() -> void:
+	assert_eq(garage.buy_cosmetic("minibus", "rims", "gold"), Garage.Result.CANT_AFFORD)
+	assert_eq(garage.buy_cosmetic("minibus", "rims", "spinners"), Garage.Result.UNKNOWN_ITEM)
+	assert_eq(garage.buy_cosmetic("minibus", "wings", "big"), Garage.Result.UNKNOWN_ITEM)
+	assert_eq(garage.buy_cosmetic("coach", "tint", "dark"), Garage.Result.NOT_OWNED)
+	assert_eq(save.cosmetic("minibus", "rims"), "steel")
+
+
+func test_cosmetics_are_per_bus() -> void:
+	save.wallet.earn(10000)
+	garage.buy_bus("city")
+	garage.buy_cosmetic("city", "stripe", "red")
+	assert_eq(save.cosmetic("city", "stripe"), "red")
+	assert_eq(save.cosmetic("minibus", "stripe"), "none")
+	assert_eq(save.cosmetics("city")["stripe"], "red")

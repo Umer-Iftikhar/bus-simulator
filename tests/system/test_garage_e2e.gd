@@ -73,3 +73,31 @@ func test_switching_map_from_menu_is_saved() -> void:
 	var last_map: String = Maps.ids()[-1]
 	await driver.select_option(menu.map_picker, last_map)
 	assert_eq(driver.saved_state().selected_map, last_map)
+
+
+func test_customise_stripe_rims_tint_and_roof_then_drive() -> void:
+	var garage := await _open_garage()
+	for key in ["stripe:gold", "rims:chrome", "tint:smoke", "roof:white"]:
+		assert_true(garage.buttons.has(key), "%s offered" % key)
+		await driver.click(driver.main.garage_menu.buttons[key])
+		await wait_process_frames(2)
+	var preview_bus: Bus = driver.main.garage_menu.preview.bus
+	assert_true(preview_bus.body.stripes[0].visible, "preview updated live")
+	var on_disk := driver.saved_state()
+	assert_eq(on_disk.cosmetic("minibus", "stripe"), "gold")
+	assert_eq(on_disk.cosmetic("minibus", "rims"), "chrome")
+	assert_eq(on_disk.cosmetic("minibus", "tint"), "smoke")
+	assert_eq(on_disk.cosmetic("minibus", "roof"), "white")
+	var spent := 0
+	for pair in [["stripe", "gold"], ["rims", "chrome"], ["tint", "smoke"], ["roof", "white"]]:
+		spent += Catalog.cosmetic_entry(pair[0], pair[1])["price"]
+	assert_eq(driver.main.save.money, 10000 - spent)
+
+	await driver.click(driver.main.garage_menu.back_button)
+	await wait_process_frames(2)
+	await driver.click(driver.main.menu.drive_button)
+	await wait_seconds(1.0)
+	var bus: Bus = driver.main.session.bus
+	assert_true(bus.body.stripes[0].visible)
+	assert_eq(bus.rim_material.albedo_color, Catalog.cosmetic_entry("rims", "chrome")["color"])
+	assert_eq(bus.body.roof.material_override, bus.body.roof_material)

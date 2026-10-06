@@ -38,6 +38,7 @@ const UPGRADE_PRICE_GROWTH := 1.6
 const BUSES := [
 	{
 		"id": "minibus",
+		"style": "minibus",
 		"display_name": "Minibus",
 		"price": 0,
 		"capacity": 12,
@@ -53,6 +54,7 @@ const BUSES := [
 	},
 	{
 		"id": "city",
+		"style": "city",
 		"display_name": "City Bus",
 		"price": 3000,
 		"capacity": 32,
@@ -68,6 +70,7 @@ const BUSES := [
 	},
 	{
 		"id": "long_city",
+		"style": "city",
 		"display_name": "Long City Bus",
 		"price": 12000,
 		"capacity": 48,
@@ -83,6 +86,7 @@ const BUSES := [
 	},
 	{
 		"id": "coach",
+		"style": "coach",
 		"display_name": "Express Coach",
 		"price": 30000,
 		"capacity": 55,
@@ -98,6 +102,7 @@ const BUSES := [
 	},
 	{
 		"id": "double_decker",
+		"style": "double_decker",
 		"display_name": "Double Decker",
 		"price": 55000,
 		"capacity": 80,
@@ -121,7 +126,100 @@ const PAINTS := [
 	{"id": "cherry", "display_name": "Cherry", "price": 450, "color": Color(0.75, 0.05, 0.15)},
 	{"id": "midnight", "display_name": "Midnight", "price": 600, "color": Color(0.08, 0.08, 0.18)},
 	{"id": "gold", "display_name": "Gold Rush", "price": 2500, "color": Color(0.85, 0.65, 0.2)},
+	{"id": "lime", "display_name": "Lime", "price": 350, "color": Color(0.5, 0.8, 0.15)},
+	{"id": "tangerine", "display_name": "Tangerine", "price": 350, "color": Color(0.95, 0.45, 0.1)},
+	{"id": "silver", "display_name": "Silver", "price": 800, "color": Color(0.72, 0.74, 0.76)},
+	{"id": "pearl", "display_name": "Pearl White", "price": 900, "color": Color(0.95, 0.94, 0.9)},
 ]
+const STRIPES := [
+	{"id": "none", "display_name": "None", "price": 0},
+	{"id": "white", "display_name": "White", "price": 300, "color": Color(0.95, 0.95, 0.95)},
+	{"id": "black", "display_name": "Black", "price": 300, "color": Color(0.05, 0.05, 0.06)},
+	{"id": "red", "display_name": "Racing Red", "price": 400, "color": Color(0.8, 0.05, 0.05)},
+	{"id": "blue", "display_name": "Blue", "price": 400, "color": Color(0.1, 0.3, 0.8)},
+	{"id": "gold", "display_name": "Gold", "price": 900, "color": Color(0.85, 0.65, 0.2)},
+]
+const RIMS := [
+	{
+		"id": "steel",
+		"display_name": "Steel",
+		"price": 0,
+		"color": Color(0.75, 0.76, 0.78),
+		"metallic": 0.8,
+		"roughness": 0.3,
+	},
+	{
+		"id": "chrome",
+		"display_name": "Chrome",
+		"price": 500,
+		"color": Color(0.95, 0.95, 0.97),
+		"metallic": 1.0,
+		"roughness": 0.05,
+	},
+	{
+		"id": "black",
+		"display_name": "Matte Black",
+		"price": 400,
+		"color": Color(0.06, 0.06, 0.07),
+		"metallic": 0.4,
+		"roughness": 0.7,
+	},
+	{
+		"id": "gold",
+		"display_name": "Gold",
+		"price": 1800,
+		"color": Color(0.9, 0.7, 0.25),
+		"metallic": 1.0,
+		"roughness": 0.15,
+	},
+]
+const TINTS := [
+	{"id": "clear", "display_name": "Clear", "price": 0, "darkness": 0.0},
+	{"id": "smoke", "display_name": "Smoke", "price": 300, "darkness": 0.45},
+	{"id": "dark", "display_name": "Limo Dark", "price": 500, "darkness": 0.85},
+]
+const ROOFS := [
+	{"id": "body", "display_name": "Body colour", "price": 0},
+	{"id": "white", "display_name": "White", "price": 200, "color": Color(0.95, 0.95, 0.95)},
+	{"id": "black", "display_name": "Black", "price": 250, "color": Color(0.07, 0.07, 0.08)},
+]
+## Every cosmetic category; the first item in each list is the free default.
+const COSMETICS := {
+	"paint": PAINTS,
+	"stripe": STRIPES,
+	"rims": RIMS,
+	"tint": TINTS,
+	"roof": ROOFS,
+}
+const COSMETIC_NAMES := {
+	"paint": "Paint",
+	"stripe": "Livery stripe",
+	"rims": "Rims",
+	"tint": "Window tint",
+	"roof": "Roof",
+}
+
+
+static func cosmetic_categories() -> PackedStringArray:
+	return PackedStringArray(COSMETICS.keys())
+
+
+static func cosmetic_ids(category: String) -> PackedStringArray:
+	var ids := PackedStringArray()
+	for item in COSMETICS.get(category, []):
+		ids.append(item["id"])
+	return ids
+
+
+static func cosmetic_default(category: String) -> String:
+	return COSMETICS[category][0]["id"]
+
+
+static func cosmetic_entry(category: String, item_id: String) -> Dictionary:
+	for item in COSMETICS.get(category, []):
+		if item["id"] == item_id:
+			return item
+	return {}
 
 
 static func bus_ids() -> PackedStringArray:

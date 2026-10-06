@@ -1,6 +1,7 @@
 class_name GarageMenu
 extends Control
-## The shop: buy buses, upgrade the selected bus and give it a paint job.
+## The shop: buy buses, upgrade the selected bus and customise its looks
+## (paint, livery stripe, rims, window tint, roof) with a live 3D preview.
 
 signal back_requested
 signal purchased
@@ -12,7 +13,9 @@ var feedback_label := Label.new()
 var bus_list := VBoxContainer.new()
 var detail := VBoxContainer.new()
 var back_button := Button.new()
-## Buttons by key ("bus:<id>", "select:<id>", "upgrade:<key>", "paint:<id>") for tests.
+var preview := GaragePreview.new()
+## Buttons by key ("bus:<id>", "select:<id>", "upgrade:<key>", "repair",
+## "<cosmetic category>:<id>") for tests.
 var buttons := {}
 
 
@@ -53,7 +56,11 @@ func _build() -> void:
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	columns.add_theme_constant_override("separation", 24)
 	root.add_child(columns)
-	columns.add_child(_scroll(bus_list))
+	var left := VBoxContainer.new()
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(left)
+	left.add_child(preview)
+	left.add_child(_scroll(bus_list))
 	columns.add_child(_scroll(detail))
 	refresh()
 
@@ -81,11 +88,13 @@ func refresh() -> void:
 	_heading(detail, "Upgrades")
 	for kind in Catalog.UPGRADE_KEYS:
 		_add_upgrade_row(current, kind)
-	_heading(detail, "Paint")
-	var paints := HFlowContainer.new()
-	detail.add_child(paints)
-	for paint_id in Catalog.paint_ids():
-		_add_paint_button(paints, current, paint_id)
+	for category in Catalog.cosmetic_categories():
+		_heading(detail, Catalog.COSMETIC_NAMES[category])
+		var flow := HFlowContainer.new()
+		detail.add_child(flow)
+		for item_id in Catalog.cosmetic_ids(category):
+			_add_cosmetic_button(flow, current, category, item_id)
+	preview.show_bus(garage.spec_for(current), save.cosmetics(current))
 
 
 func _heading(parent: Control, text: String) -> void:
@@ -166,24 +175,27 @@ func _add_repair_row(bus_id: String) -> void:
 	row.add_child(button)
 
 
-func _add_paint_button(parent: Control, bus_id: String, paint_id: String) -> void:
-	var entry := Catalog.paint_entry(paint_id)
-	var owned: bool = save.owned[bus_id]["paints"].has(paint_id)
+func _add_cosmetic_button(
+	parent: Control, bus_id: String, category: String, item_id: String
+) -> void:
+	var entry := Catalog.cosmetic_entry(category, item_id)
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(150, 52)
-	if save.paint(bus_id) == paint_id:
+	if save.cosmetic(bus_id, category) == item_id:
 		button.text = "%s ✓" % entry["display_name"]
 		button.disabled = true
-	elif owned:
+	elif save.owns_cosmetic(bus_id, category, item_id):
 		button.text = entry["display_name"]
 	else:
 		button.text = "%s $%d" % [entry["display_name"], entry["price"]]
 		button.disabled = not save.wallet.can_afford(entry["price"])
-	button.add_theme_color_override(
-		"font_color", Catalog.paint_color(bus_id, paint_id).lightened(0.3)
-	)
-	button.pressed.connect(func() -> void: _apply(garage.buy_paint(bus_id, paint_id)))
-	buttons["paint:%s" % paint_id] = button
+	var swatch: Variant = entry.get("color")
+	if category == "paint":
+		swatch = Catalog.paint_color(bus_id, item_id)
+	if swatch is Color:
+		button.add_theme_color_override("font_color", (swatch as Color).lightened(0.3))
+	button.pressed.connect(func() -> void: _apply(garage.buy_cosmetic(bus_id, category, item_id)))
+	buttons["%s:%s" % [category, item_id]] = button
 	parent.add_child(button)
 
 

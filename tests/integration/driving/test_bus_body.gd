@@ -1,7 +1,7 @@
 extends TestCase
 ## The bus's visual shell: glass, shared paint, interior and draw-call budget.
 
-const MAX_BUS_DRAW_ITEMS := 90
+const MAX_BUS_DRAW_ITEMS := 110
 
 
 func _bus(bus_id := "city") -> Bus:
