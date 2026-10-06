@@ -5,7 +5,9 @@ extends Node3D
 ##
 ## Options (all optional):
 ##   "performance": {top_speed, acceleration, brakes, handling} multipliers
-##   "seed": int passenger seed (random when absent)
+##   "seed": int seed for passengers and traffic (random when absent)
+##   "damage": DamageModel dictionary the bus starts with (default pristine)
+##   "traffic": bool, spawn AI traffic (default true)
 
 signal run_finished(result: Dictionary)
 signal exit_requested
@@ -21,6 +23,8 @@ var horn: Horn
 var camera_rig: CameraRig
 var player_input: PlayerInput
 var run: RunController
+var damage: DamageModel
+var traffic: TrafficManager
 var ui: CanvasLayer
 var hud: Hud
 var touch_controls: TouchControls
@@ -55,6 +59,13 @@ func _ready() -> void:
 	run = RunController.create(map, bus, run_seed)
 	add_child(run)
 
+	traffic = TrafficManager.create(world.track, bus)
+	add_child(traffic)
+	if options.get("traffic", true):
+		traffic.spawn(map.traffic_cars, run_seed, SPAWN_OFFSET)
+
+	damage = DamageModel.from_dict(options.get("damage", {}))
+
 	ui = CanvasLayer.new()
 	ui.name = "UI"
 	add_child(ui)
@@ -75,6 +86,11 @@ func _ready() -> void:
 	run.stop_served.connect(_on_stop_served)
 	run.stop_missed.connect(_on_stop_missed)
 	run.run_finished.connect(_on_run_finished)
+	bus.impact.connect(_on_impact)
+	damage.changed.connect(_on_damage_changed)
+	damage.mirror_shattered.connect(_on_mirror_shattered)
+	damage.wrecked.connect(_on_wrecked)
+	_on_damage_changed()
 	_refresh_hud()
 
 
@@ -102,6 +118,26 @@ func _refresh_hud() -> void:
 	hud.show_next_stop(next.stop_name if next else "", run.distance_to_next_stop())
 	hud.show_passengers(run.route.on_board_count(), spec.capacity)
 	hud.show_fares(run.route.earnings_so_far())
+
+
+func _on_impact(part: String, impact_speed: float) -> void:
+	if not run.finished:
+		damage.apply_impact(part, impact_speed)
+
+
+func _on_damage_changed() -> void:
+	bus.damage_speed_factor = damage.speed_factor()
+	bus.set_wear(1.0 - damage.overall())
+	hud.show_health(damage.health_percent())
+
+
+func _on_mirror_shattered(part: String) -> void:
+	hud.flash("%s mirror smashed!" % ("Left" if part == DamageModel.MIRROR_LEFT else "Right"))
+
+
+func _on_wrecked() -> void:
+	hud.flash("Bus wrecked!")
+	run.fail_run()
 
 
 func _on_stop_served(stop_index: int, alighted: int, boarded: int, left_behind: int) -> void:

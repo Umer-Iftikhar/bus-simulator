@@ -29,6 +29,7 @@ func persist() -> void:
 
 
 func show_menu() -> void:
+	_store_session_damage()
 	_clear_screens()
 	menu = MainMenu.create(save, garage)
 	menu.drive_requested.connect(start_drive)
@@ -48,7 +49,13 @@ func show_garage() -> void:
 func start_drive() -> void:
 	_clear_screens()
 	var map := Maps.get_map(save.selected_map)
-	var options := {"performance": garage.performance(save.selected_bus)}
+	if garage.damage_of(save.selected_bus).is_wrecked():
+		show_menu()
+		return
+	var options := {
+		"performance": garage.performance(save.selected_bus),
+		"damage": save.damage(save.selected_bus),
+	}
 	if run_seed >= 0:
 		options["seed"] = run_seed
 	session = DriveSession.create(map, garage.spec_for(save.selected_bus), options)
@@ -59,7 +66,15 @@ func start_drive() -> void:
 
 func _on_run_finished(result: Dictionary) -> void:
 	garage.record_run(result["payout"], result["delivered"])
+	_store_session_damage()
 	persist()
+
+
+## Damage sticks to the bus whether the run was finished, failed or abandoned.
+func _store_session_damage() -> void:
+	if is_instance_valid(session) and session.damage != null:
+		garage.store_damage(save.selected_bus, session.damage)
+		persist()
 
 
 func _clear_screens() -> void:

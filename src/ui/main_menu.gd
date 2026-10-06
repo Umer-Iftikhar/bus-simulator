@@ -12,6 +12,7 @@ var money_label := Label.new()
 var map_picker := OptionButton.new()
 var bus_picker := OptionButton.new()
 var map_info := Label.new()
+var condition_label := Label.new()
 var drive_button := Button.new()
 var garage_button := Button.new()
 
@@ -31,12 +32,14 @@ func _build() -> void:
 	background.color = Color(0.11, 0.25, 0.42)
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(center)
 	var column := VBoxContainer.new()
-	column.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
 	column.add_theme_constant_override("separation", 14)
 	column.custom_minimum_size = Vector2(520, 0)
-	add_child(column)
+	center.add_child(column)
 
 	var title := Label.new()
 	title.text = "Bus Simulator"
@@ -64,6 +67,9 @@ func _build() -> void:
 	bus_picker.item_selected.connect(_on_bus_selected)
 	_big(bus_picker)
 	column.add_child(bus_picker)
+	condition_label.name = "Condition"
+	condition_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(condition_label)
 
 	drive_button.name = "DriveButton"
 	drive_button.text = "Drive"
@@ -98,6 +104,13 @@ func refresh() -> void:
 		bus_picker.set_item_metadata(bus_picker.item_count - 1, bus_id)
 		if bus_id == save.selected_bus:
 			bus_picker.select(bus_picker.item_count - 1)
+	var damage := garage.damage_of(save.selected_bus)
+	if damage.is_wrecked():
+		condition_label.text = "This bus is wrecked — repair it in the Garage"
+		drive_button.disabled = true
+	else:
+		condition_label.text = "Condition: %d%%" % damage.health_percent()
+		drive_button.disabled = false
 
 
 func _on_map_selected(index: int) -> void:

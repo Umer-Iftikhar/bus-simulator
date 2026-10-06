@@ -112,3 +112,25 @@ func test_results_panel_failed_run() -> void:
 	autofree(panel)
 	assert_eq(panel.title.text, "Bus wrecked!")
 	assert_true(panel.lines.text.contains("$0"))
+
+
+func test_every_main_menu_control_is_on_screen() -> void:
+	var menu := add_child_autofree(MainMenu.create(save, garage)) as MainMenu
+	await wait_process_frames(2)
+	var screen := Rect2(Vector2.ZERO, menu.size)
+	for control in [menu.map_picker, menu.bus_picker, menu.drive_button, menu.garage_button]:
+		assert_true(screen.encloses(control.get_global_rect()), "%s on screen" % control.name)
+
+
+func test_results_panel_is_centred_on_screen() -> void:
+	var layer := add_child_autofree(CanvasLayer.new())
+	var panel := ResultsPanel.create({"delivered": 1, "fare": 1, "payout": 1})
+	layer.add_child(panel)
+	await wait_process_frames(2)
+	var viewport := panel.get_viewport_rect()
+	assert_true(viewport.encloses(panel.get_global_rect()), "fully visible")
+	assert_vec3_almost_eq(
+		Vector3(panel.get_global_rect().get_center().x, panel.get_global_rect().get_center().y, 0),
+		Vector3(viewport.get_center().x, viewport.get_center().y, 0),
+		2.0
+	)

@@ -17,8 +17,10 @@ static func create(result: Dictionary) -> ResultsPanel:
 
 func _init() -> void:
 	name = "ResultsPanel"
-	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	custom_minimum_size = Vector2(520, 320)
+	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	grow_horizontal = Control.GROW_DIRECTION_BOTH
+	grow_vertical = Control.GROW_DIRECTION_BOTH
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 14)
 	add_child(column)
