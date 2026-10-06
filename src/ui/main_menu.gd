@@ -13,6 +13,7 @@ var map_picker := OptionButton.new()
 var bus_picker := OptionButton.new()
 var map_info := Label.new()
 var condition_label := Label.new()
+var mirror_quality_picker := OptionButton.new()
 var drive_button := Button.new()
 var garage_button := Button.new()
 
@@ -82,6 +83,13 @@ func _build() -> void:
 	garage_button.pressed.connect(garage_requested.emit)
 	_big(garage_button)
 	column.add_child(garage_button)
+	mirror_quality_picker.name = "MirrorQuality"
+	mirror_quality_picker.add_item("Mirrors: High quality")
+	mirror_quality_picker.set_item_metadata(0, "high")
+	mirror_quality_picker.add_item("Mirrors: Battery saver")
+	mirror_quality_picker.set_item_metadata(1, "low")
+	mirror_quality_picker.item_selected.connect(_on_mirror_quality_selected)
+	column.add_child(mirror_quality_picker)
 	refresh()
 
 
@@ -104,6 +112,9 @@ func refresh() -> void:
 		bus_picker.set_item_metadata(bus_picker.item_count - 1, bus_id)
 		if bus_id == save.selected_bus:
 			bus_picker.select(bus_picker.item_count - 1)
+	for i in mirror_quality_picker.item_count:
+		if mirror_quality_picker.get_item_metadata(i) == save.settings["mirror_quality"]:
+			mirror_quality_picker.select(i)
 	var damage := garage.damage_of(save.selected_bus)
 	if damage.is_wrecked():
 		condition_label.text = "This bus is wrecked — repair it in the Garage"
@@ -116,6 +127,11 @@ func refresh() -> void:
 func _on_map_selected(index: int) -> void:
 	garage.select_map(map_picker.get_item_metadata(index))
 	refresh()
+	selection_changed.emit()
+
+
+func _on_mirror_quality_selected(index: int) -> void:
+	save.settings["mirror_quality"] = mirror_quality_picker.get_item_metadata(index)
 	selection_changed.emit()
 
 

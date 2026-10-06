@@ -14,6 +14,8 @@ signal run_finished(result: Dictionary)
 signal exit_requested
 
 const SPAWN_OFFSET := 6.0
+## How long the doors stay open after a stop is served.
+const DOOR_OPEN_SECONDS := 1.5
 
 var map: MapDef
 var spec: BusSpec
@@ -54,6 +56,7 @@ func _ready() -> void:
 	_apply_performance(options.get("performance", {}))
 	horn = Horn.new()
 	bus.add_child(horn)
+	bus.set_headlights(map.night)
 	mirrors = MirrorRig.create(bus, options.get("mirror_refresh", 1))
 	bus.add_child(mirrors)
 
@@ -194,10 +197,17 @@ func _on_wrecked() -> void:
 
 
 func _on_stop_served(stop_index: int, alighted: int, boarded: int, left_behind: int) -> void:
+	bus.open_doors()
+	get_tree().create_timer(DOOR_OPEN_SECONDS, false, true).timeout.connect(_close_doors)
 	var text := "%s: %d on, %d off" % [map.stop_name(stop_index), boarded, alighted]
 	if left_behind > 0:
 		text += " — bus full, %d left behind" % left_behind
 	hud.flash(text)
+
+
+func _close_doors() -> void:
+	if is_instance_valid(bus):
+		bus.close_doors()
 
 
 func _on_stop_missed(stop_index: int) -> void:
