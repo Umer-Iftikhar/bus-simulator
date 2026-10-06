@@ -7,6 +7,8 @@ signal horn_requested
 signal pause_requested
 signal indicator_left_requested
 signal indicator_right_requested
+signal gear_requested
+signal lights_requested
 
 var bus: Bus
 var touch: TouchControls
@@ -24,6 +26,8 @@ func _ready() -> void:
 		touch.menu_requested.connect(pause_requested.emit)
 		touch.indicator_left_requested.connect(indicator_left_requested.emit)
 		touch.indicator_right_requested.connect(indicator_right_requested.emit)
+		touch.gear_requested.connect(gear_requested.emit)
+		touch.lights_requested.connect(lights_requested.emit)
 
 
 func _physics_process(_delta: float) -> void:
@@ -51,3 +55,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		indicator_left_requested.emit()
 	elif event.is_action_pressed("indicator_right"):
 		indicator_right_requested.emit()
+	elif event.is_action_pressed("gear"):
+		gear_requested.emit()
+	elif event.is_action_pressed("headlights"):
+		lights_requested.emit()

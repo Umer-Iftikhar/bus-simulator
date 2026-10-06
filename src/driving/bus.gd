@@ -9,6 +9,7 @@ signal command_changed
 ## A collision this physics step: [param part] is a [DamageModel] part name and
 ## [param impact_speed] the velocity change (m/s) it caused.
 signal impact(part: String, impact_speed: float)
+signal gear_changed(reverse: bool)
 
 const WHEEL_RADIUS := 0.5
 const SUSPENSION_REST := 0.4
@@ -41,6 +42,12 @@ var handling_factor := 1.0
 var controls_enabled := true
 ## Visual shell (panels, glass, interior).
 var body: BusBody
+## Gearbox: false = Drive, true = Reverse.
+var reverse_gear := false
+var headlights_on := false
+## Indicator lamp state mirrored on the dashboard (set by the session).
+var dash_left := false
+var dash_right := false
 ## DamageModel mirror part -> MeshInstance3D showing the mirror glass.
 var mirror_glass := {}
 var doors_open := false
@@ -160,9 +167,10 @@ func _build_headlights() -> void:
 		lamp.position = Vector3(side * (spec.width / 2.0 - 0.35), 0.95, spec.length / 2.0 + 0.05)
 		# SpotLight3D shines down its -Z; turn it to face the bus's +Z.
 		lamp.rotation = Vector3(-0.08, PI, 0.0)
-		lamp.spot_range = 45.0
-		lamp.spot_angle = 32.0
-		lamp.light_energy = 6.0
+		lamp.spot_range = 70.0
+		lamp.spot_angle = 36.0
+		lamp.spot_attenuation = 0.8
+		lamp.light_energy = 14.0
 		lamp.light_color = Color(1.0, 0.95, 0.85)
 		lamp.visible = false
 		add_child(lamp)
@@ -170,8 +178,39 @@ func _build_headlights() -> void:
 
 
 func set_headlights(on: bool) -> void:
+	headlights_on = on
 	for lamp in headlights:
 		lamp.visible = on
+	_update_lights()
+
+
+func toggle_headlights() -> void:
+	set_headlights(not headlights_on)
+
+
+## Shifts between Drive and Reverse. Only allowed when (nearly) stopped;
+## returns false and changes nothing otherwise.
+func set_reverse(reverse: bool) -> bool:
+	if reverse == reverse_gear:
+		return true
+	if not Drivetrain.can_change_gear(forward_speed()):
+		return false
+	reverse_gear = reverse
+	_update_lights()
+	gear_changed.emit(reverse_gear)
+	return true
+
+
+func toggle_gear() -> bool:
+	return set_reverse(not reverse_gear)
+
+
+func is_braking() -> bool:
+	return input.brake > 0.05
+
+
+func _update_lights() -> void:
+	body.set_lights(headlights_on, is_braking(), reverse_gear)
 
 
 ## Bus-local centre of a side mirror head ([constant DamageModel.MIRROR_LEFT] or RIGHT).
@@ -484,18 +523,24 @@ func _physics_process(delta: float) -> void:
 		steering = move_toward(steering, 0.0, delta)
 		return
 	input.steer_rate = 2.0 * handling_factor
-	input.update(_target_throttle, _target_brake, _target_steer, delta)
 	var speed := forward_speed()
 	var top := effective_top_speed()
+	var speed_ratio := absf(speed) / top if top > 0.0 else 0.0
+	input.update(_target_throttle, _target_brake, _target_steer, delta, speed_ratio)
 	var drive := Drivetrain.compute(
 		input.throttle,
 		input.brake,
 		speed,
 		top,
 		spec.engine_force * acceleration_factor / 2.0,
-		spec.brake_force * brake_factor
+		spec.brake_force * brake_factor,
+		reverse_gear
 	)
 	engine_force = drive["engine_force"]
 	brake = drive["brake"]
 	# Steering is "left positive" in VehicleBody3D, our input is "right positive".
 	steering = -input.steer * Drivetrain.steer_limit(spec.max_steer, speed, top)
+	_update_lights()
+	body.update_dashboard(
+		speed_kmh(), input.steer, input.throttle, dash_left, dash_right, reverse_gear
+	)

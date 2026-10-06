@@ -12,6 +12,8 @@ const BINDINGS := {
 	"camera_cycle": [KEY_C],
 	"horn": [KEY_H],
 	"pause": [KEY_ESCAPE],
+	"gear": [KEY_R],
+	"headlights": [KEY_L],
 }
 
 

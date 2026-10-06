@@ -78,7 +78,9 @@ func test_mirror_views_do_not_cover_touch_controls_or_hud() -> void:
 		tc.horn_button,
 		tc.menu_button,
 		tc.indicator_left_button,
-		tc.indicator_right_button
+		tc.indicator_right_button,
+		tc.gear_button,
+		tc.lights_button,
 	]
 	var info := session.hud.info.get_global_rect()
 	for view in session.mirror_panel.views.values():

@@ -14,6 +14,8 @@ var health_label := Label.new()
 var message_label := Label.new()
 var info := VBoxContainer.new()
 var _message_timer := 0.0
+var _reverse := false
+var _last_kmh := 0.0
 
 
 func _init() -> void:
@@ -31,7 +33,12 @@ func _init() -> void:
 	fares_label.name = "Fares"
 	health_label.name = "Health"
 	var labels := [
-		speed_label, camera_label, stop_label, passengers_label, fares_label, health_label
+		speed_label,
+		camera_label,
+		stop_label,
+		passengers_label,
+		fares_label,
+		health_label,
 	]
 	for label in labels:
 		add_label(label)
@@ -44,6 +51,7 @@ func _init() -> void:
 	add_child(message_label)
 	show_speed(0.0)
 	show_camera_mode(CameraModes.Mode.CHASE)
+	show_gear(false)
 
 
 func add_label(label: Label) -> void:
@@ -58,7 +66,8 @@ func _style(label: Label) -> void:
 
 
 func show_speed(kmh: float) -> void:
-	speed_label.text = "%d km/h" % roundi(kmh)
+	_last_kmh = kmh
+	speed_label.text = "%d km/h  %s" % [roundi(kmh), "R" if _reverse else "D"]
 
 
 func show_camera_mode(mode: CameraModes.Mode) -> void:
@@ -80,6 +89,12 @@ func show_passengers(on_board: int, capacity: int) -> void:
 
 func show_fares(amount: int) -> void:
 	fares_label.text = "Fares: $%d" % amount
+
+
+## The gear shows next to the speed: D (drive) or R (reverse).
+func show_gear(reverse: bool) -> void:
+	_reverse = reverse
+	show_speed(_last_kmh)
 
 
 func show_health(percent: int) -> void:

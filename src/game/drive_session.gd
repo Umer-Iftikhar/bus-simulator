@@ -102,6 +102,9 @@ func _ready() -> void:
 	player_input.indicator_right_requested.connect(
 		func() -> void: indicators.toggle_right(current_lane())
 	)
+	player_input.gear_requested.connect(_on_gear_requested)
+	player_input.lights_requested.connect(bus.toggle_headlights)
+	bus.gear_changed.connect(_on_gear_changed)
 	run.stop_served.connect(_on_stop_served)
 	run.stop_missed.connect(_on_stop_missed)
 	run.run_finished.connect(_on_run_finished)
@@ -132,8 +135,21 @@ func _physics_process(delta: float) -> void:
 	var left := indicators.left_lamp()
 	var right := indicators.right_lamp()
 	bus.set_indicator_lamps(left, right)
+	bus.dash_left = left
+	bus.dash_right = right
+	touch_controls.show_headlights(bus.headlights_on)
 	touch_controls.show_indicators(left, right)
 	traffic.signal_lane = indicators.target_lane
+
+
+func _on_gear_requested() -> void:
+	if not bus.toggle_gear():
+		hud.flash("Stop the bus to change gear")
+
+
+func _on_gear_changed(reverse: bool) -> void:
+	hud.show_gear(reverse)
+	touch_controls.show_gear(reverse)
 
 
 func _apply_performance(factors: Dictionary) -> void:
