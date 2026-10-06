@@ -19,7 +19,7 @@ func test_every_bus_completes_a_lap_on_every_map() -> void:
 
 
 func _drive_lap(map: MapDef, bus_id: String) -> void:
-	var session := DriveSession.create(map, Catalog.bus_spec(bus_id), {"seed": 1})
+	var session := DriveSession.create(map, Catalog.bus_spec(bus_id), {"seed": 1, "traffic": false})
 	add_child_autofree(session)
 	await wait_seconds(1.0)
 	var bus := session.bus

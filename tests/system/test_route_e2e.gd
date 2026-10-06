@@ -19,8 +19,11 @@ func _drive(skip: Array = []) -> Dictionary:
 	await wait_seconds(1.0)
 	var session: DriveSession = driver.main.session
 	var pilot := Autopilot.new(session.bus, session.world.track)
+	pilot.traffic = session.traffic
 	var finished := await pilot.drive_route(get_tree(), session.run, skip)
 	assert_true(finished, "route completed by driving")
+	assert_gt(session.traffic.cars.size(), 0, "driven in live traffic")
+	assert_eq(session.damage.health_percent(), 100, "careful driving in traffic causes no damage")
 	await wait_process_frames(2)
 	return session.run.result()
 

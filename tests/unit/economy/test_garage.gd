@@ -113,3 +113,35 @@ func test_record_run_banks_payout_and_stats() -> void:
 	garage.record_run(0, 0)
 	assert_eq(save.money, 240)
 	assert_eq(save.stats, {"runs": 2, "delivered": 20, "earned": 240})
+
+
+func _damage(bus_id: String, parts: Dictionary) -> void:
+	save.owned[bus_id]["damage"] = parts
+
+
+func test_repair_charges_cost_and_restores_bus() -> void:
+	_damage("minibus", {"body_front": 0.4, "mirror_left": 0.0})
+	var cost := garage.repair_cost("minibus")
+	assert_gt(cost, 0)
+	save.wallet.earn(cost + 5)
+	assert_eq(garage.repair("minibus"), Garage.Result.OK)
+	assert_eq(save.money, 5)
+	assert_true(garage.damage_of("minibus").is_pristine())
+	assert_eq(save.damage("minibus"), {})
+
+
+func test_repair_failures() -> void:
+	assert_eq(garage.repair("minibus"), Garage.Result.NOT_DAMAGED)
+	assert_eq(garage.repair("coach"), Garage.Result.NOT_OWNED)
+	_damage("minibus", {"body_rear": 0.1})
+	assert_eq(garage.repair("minibus"), Garage.Result.CANT_AFFORD)
+	assert_eq(save.damage("minibus"), {"body_rear": 0.1}, "unpaid repair changes nothing")
+
+
+func test_store_damage_saves_only_damaged_parts() -> void:
+	var model := DamageModel.new()
+	model.apply_impact(DamageModel.BODY_LEFT, 5.0)
+	garage.store_damage("minibus", model)
+	assert_eq(save.damage("minibus").keys(), [DamageModel.BODY_LEFT])
+	garage.store_damage("coach", model)
+	assert_false(save.owns("coach"), "storing damage never grants a bus")

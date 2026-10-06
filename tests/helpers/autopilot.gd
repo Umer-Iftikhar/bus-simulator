@@ -10,6 +10,8 @@ const COMFORT_DECEL := 1.6
 
 var bus: Bus
 var track: Track
+## Optional: when set, the autopilot keeps a safe distance from cars ahead.
+var traffic: TrafficManager
 var lane := 0
 var cruise_speed := 11.0
 ## Offset (m along loop) to stop at, or -1 to keep driving.
@@ -35,6 +37,7 @@ func step() -> void:
 		if remaining > track.length() - 20.0:
 			remaining = 0.0
 		target_speed = minf(cruise_speed, sqrt(2.0 * COMFORT_DECEL * maxf(remaining - 1.0, 0.0)))
+	target_speed = minf(target_speed, _traffic_limit())
 	var speed := bus.forward_speed()
 	if target_speed < 0.3:
 		_set_pedals(0.0, 1.0 if speed > 0.05 else 0.0)
@@ -69,6 +72,26 @@ func drive_route(
 	release()
 	stop_at = -1.0
 	return true
+
+
+## Highest safe speed given the nearest car ahead in our lane.
+func _traffic_limit() -> float:
+	if traffic == null:
+		return INF
+	var car := traffic.nearest_ahead(bus.global_position, lane, 80.0)
+	if car == null:
+		return INF
+	var bus_front := track.closest_offset(bus.global_position) + bus.spec.length / 2.0
+	var gap := track.distance_ahead(bus_front, car.rear_offset())
+	if gap > 70.0:
+		return INF
+	return maxf(
+		0.0,
+		minf(
+			car.speed + (gap - 10.0) * 0.4,
+			sqrt(2.0 * COMFORT_DECEL * maxf(gap - 6.0, 0.0)) + car.speed
+		)
+	)
 
 
 func stopped() -> bool:

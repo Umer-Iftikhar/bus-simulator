@@ -10,6 +10,7 @@ var camera_label := Label.new()
 var stop_label := Label.new()
 var passengers_label := Label.new()
 var fares_label := Label.new()
+var health_label := Label.new()
 var message_label := Label.new()
 var info := VBoxContainer.new()
 var _message_timer := 0.0
@@ -28,7 +29,11 @@ func _init() -> void:
 	stop_label.name = "NextStop"
 	passengers_label.name = "Passengers"
 	fares_label.name = "Fares"
-	for label in [speed_label, camera_label, stop_label, passengers_label, fares_label]:
+	health_label.name = "Health"
+	var labels := [
+		speed_label, camera_label, stop_label, passengers_label, fares_label, health_label
+	]
+	for label in labels:
 		add_label(label)
 	message_label.name = "Message"
 	message_label.add_theme_font_size_override("font_size", 28)
@@ -75,6 +80,16 @@ func show_passengers(on_board: int, capacity: int) -> void:
 
 func show_fares(amount: int) -> void:
 	fares_label.text = "Fares: $%d" % amount
+
+
+func show_health(percent: int) -> void:
+	health_label.text = "Bus health: %d%%" % percent
+	var color := Color.WHITE
+	if percent < 35:
+		color = Color(1.0, 0.35, 0.3)
+	elif percent < 70:
+		color = Color(1.0, 0.8, 0.3)
+	health_label.add_theme_color_override("font_color", color)
 
 
 func flash(text: String) -> void:

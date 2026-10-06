@@ -6,17 +6,25 @@ extends VehicleBody3D
 ## Local axes: +Z is forward, +Y is up, +X is the bus's left-hand side.
 
 signal command_changed
+## A collision this physics step: [param part] is a [DamageModel] part name and
+## [param impact_speed] the velocity change (m/s) it caused.
+signal impact(part: String, impact_speed: float)
 
 const WHEEL_RADIUS := 0.5
 const SUSPENSION_REST := 0.4
 const BODY_CLEARANCE := 0.55
 ## Low centre of mass: engine, chassis and batteries sit under the floor.
 const CENTER_OF_MASS_HEIGHT := 0.25
+## Largest acceleration normal driving can produce (hard braking, full-lock
+## turns); velocity changes beyond this between steps are collisions.
+const MAX_DRIVING_ACCEL := 14.0
 
 var spec: BusSpec
 var input := DriveInput.new()
-## Multiplier on top speed from upgrades and damage (1.0 = stock).
+## Multiplier on top speed from upgrades (1.0 = stock).
 var top_speed_factor := 1.0
+## Multiplier on top speed from damage (1.0 = undamaged).
+var damage_speed_factor := 1.0
 ## Multiplier on engine force (acceleration upgrades).
 var acceleration_factor := 1.0
 ## Multiplier on brake force (brake upgrades).
@@ -30,6 +38,9 @@ var _target_throttle := 0.0
 var _target_brake := 0.0
 var _target_steer := 0.0
 var _body_mesh: MeshInstance3D
+var _paint := Color.WHITE
+var _wear := 0.0
+var _last_velocity := Vector3.ZERO
 
 
 static func create(bus_spec: BusSpec) -> Bus:
@@ -148,14 +159,29 @@ func set_command(throttle: float, brake_pedal: float, steer_target: float) -> vo
 
 
 func set_paint(paint: Color) -> void:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = paint
-	material.roughness = 0.45
-	_body_mesh.material_override = material
+	_paint = paint
+	_update_body_material()
 
 
 func get_paint() -> Color:
+	return _paint
+
+
+## Visual wear from 0 (pristine) to 1 (wrecked): the paint dulls and darkens.
+func set_wear(amount: float) -> void:
+	_wear = clampf(amount, 0.0, 1.0)
+	_update_body_material()
+
+
+func body_color() -> Color:
 	return (_body_mesh.material_override as StandardMaterial3D).albedo_color
+
+
+func _update_body_material() -> void:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = _paint.lerp(Color(0.25, 0.22, 0.2), _wear * 0.7)
+	material.roughness = lerpf(0.45, 0.95, _wear)
+	_body_mesh.material_override = material
 
 
 ## Signed speed along the bus's forward axis in m/s (negative when reversing).
@@ -168,11 +194,40 @@ func speed_kmh() -> float:
 
 
 func effective_top_speed() -> float:
-	return spec.top_speed * top_speed_factor
+	return spec.top_speed * top_speed_factor * damage_speed_factor
 
 
 func forward_vector() -> Vector3:
 	return global_transform.basis.z
+
+
+## Detects crashes. Godot reports contact impulses a step late, so a glancing
+## hit that bounces clear would go unseen; instead the bus's own sudden
+## velocity change (beyond what driving forces could cause) measures the
+## impact, and the contact normals say which part took it.
+func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
+	var jump := (state.linear_velocity - _last_velocity).length()
+	_last_velocity = state.linear_velocity
+	var sudden := jump - MAX_DRIVING_ACCEL * state.step
+	var to_local := global_transform.affine_inverse()
+	var best_part := ""
+	var best_impulse := -1.0
+	var impulse_dv := 0.0
+	for i in state.get_contact_count():
+		var normal := state.get_contact_local_normal(i)
+		if normal.y > 0.7:
+			continue
+		var impulse := state.get_contact_impulse(i).length()
+		impulse_dv += impulse / mass
+		if impulse > best_impulse:
+			best_impulse = impulse
+			var local_point := to_local * state.get_contact_local_position(i)
+			best_part = DamageModel.part_for_contact(local_point, to_local.basis * normal, spec)
+	if best_part.is_empty():
+		return
+	var strength := maxf(sudden, impulse_dv)
+	if strength >= DamageModel.MIN_IMPACT:
+		impact.emit(best_part, strength)
 
 
 func _physics_process(delta: float) -> void:

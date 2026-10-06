@@ -76,7 +76,9 @@ func refresh() -> void:
 	for bus_id in Catalog.bus_ids():
 		_add_bus_row(bus_id)
 	var current := save.selected_bus
-	_heading(detail, "Upgrades — %s" % Catalog.bus_entry(current)["display_name"])
+	_heading(detail, "Condition — %s" % Catalog.bus_entry(current)["display_name"])
+	_add_repair_row(current)
+	_heading(detail, "Upgrades")
 	for kind in Catalog.UPGRADE_KEYS:
 		_add_upgrade_row(current, kind)
 	_heading(detail, "Paint")
@@ -134,6 +136,33 @@ func _add_upgrade_row(bus_id: String, kind: Catalog.Upgrade) -> void:
 	button.disabled = price < 0 or not save.wallet.can_afford(price)
 	button.pressed.connect(func() -> void: _apply(garage.buy_upgrade(bus_id, kind)))
 	buttons["upgrade:%s" % Catalog.upgrade_key(kind)] = button
+	row.add_child(button)
+
+
+func _add_repair_row(bus_id: String) -> void:
+	var row := HBoxContainer.new()
+	detail.add_child(row)
+	var damage := garage.damage_of(bus_id)
+	var label := Label.new()
+	label.text = "Health %d%%" % damage.health_percent()
+	for mirror in DamageModel.MIRRORS:
+		if damage.is_mirror_broken(mirror):
+			label.text += (
+				", %s mirror broken" % ("left" if mirror == DamageModel.MIRROR_LEFT else "right")
+			)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(label)
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(150, 52)
+	if damage.is_pristine():
+		button.text = "Mint"
+		button.disabled = true
+	else:
+		var cost := damage.repair_cost(bus_id)
+		button.text = "Repair $%d" % cost
+		button.disabled = not save.wallet.can_afford(cost)
+	button.pressed.connect(func() -> void: _apply(garage.repair(bus_id)))
+	buttons["repair"] = button
 	row.add_child(button)
 
 

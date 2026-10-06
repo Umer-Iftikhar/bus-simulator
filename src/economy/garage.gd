@@ -3,7 +3,7 @@ extends RefCounted
 ## Purchase rules on top of [SaveData]: buying buses, upgrades and paint,
 ## selecting what to drive, and banking run earnings.
 
-enum Result { OK, ALREADY_OWNED, NOT_OWNED, UNKNOWN_ITEM, CANT_AFFORD, MAXED }
+enum Result { OK, ALREADY_OWNED, NOT_OWNED, UNKNOWN_ITEM, CANT_AFFORD, MAXED, NOT_DAMAGED }
 
 const RESULT_TEXT := {
 	Result.OK: "Done",
@@ -12,6 +12,7 @@ const RESULT_TEXT := {
 	Result.UNKNOWN_ITEM: "Unknown item",
 	Result.CANT_AFFORD: "Not enough money",
 	Result.MAXED: "Already at max level",
+	Result.NOT_DAMAGED: "Nothing to repair",
 }
 
 var save: SaveData
@@ -76,6 +77,32 @@ func buy_paint(bus_id: String, paint_id: String) -> Result:
 		bus["paints"].append(paint_id)
 	bus["paint"] = paint_id
 	return Result.OK
+
+
+func damage_of(bus_id: String) -> DamageModel:
+	return DamageModel.from_dict(save.damage(bus_id))
+
+
+func repair_cost(bus_id: String) -> int:
+	return damage_of(bus_id).repair_cost(bus_id)
+
+
+## Repairing is optional: a dented bus still drives (slower) until it's wrecked.
+func repair(bus_id: String) -> Result:
+	if not save.owns(bus_id):
+		return Result.NOT_OWNED
+	var model := damage_of(bus_id)
+	if model.is_pristine():
+		return Result.NOT_DAMAGED
+	if not save.wallet.spend(model.repair_cost(bus_id)):
+		return Result.CANT_AFFORD
+	save.owned[bus_id]["damage"] = {}
+	return Result.OK
+
+
+func store_damage(bus_id: String, model: DamageModel) -> void:
+	if save.owns(bus_id):
+		save.owned[bus_id]["damage"] = model.to_dict()
 
 
 ## Performance multipliers from upgrades: keys match [constant Catalog.UPGRADE_KEYS].
