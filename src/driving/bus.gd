@@ -39,6 +39,8 @@ var brake_factor := 1.0
 var handling_factor := 1.0
 ## When false the bus ignores commands and holds the brakes (e.g. bus wrecked, run over).
 var controls_enabled := true
+## Visual shell (panels, glass, interior).
+var body: BusBody
 ## DamageModel mirror part -> MeshInstance3D showing the mirror glass.
 var mirror_glass := {}
 var doors_open := false
@@ -48,7 +50,6 @@ var headlights: Array[SpotLight3D] = []
 var _target_throttle := 0.0
 var _target_brake := 0.0
 var _target_steer := 0.0
-var _body_mesh: MeshInstance3D
 var _paint := Color.WHITE
 var _wear := 0.0
 var _last_velocity := Vector3.ZERO
@@ -85,15 +86,9 @@ func _build() -> void:
 	shape.position = Vector3(0, BODY_CLEARANCE + body_height / 2.0, 0)
 	add_child(shape)
 
-	_body_mesh = MeshInstance3D.new()
-	_body_mesh.name = "BodyMesh"
-	var body_box := BoxMesh.new()
-	body_box.size = box.size
-	_body_mesh.mesh = body_box
-	_body_mesh.position = shape.position
-	add_child(_body_mesh)
+	body = BusBody.create(spec, BODY_CLEARANCE)
+	add_child(body)
 	set_paint(spec.color)
-	_build_windows(body_height)
 
 	_build_lamps()
 	_build_mirrors()
@@ -108,30 +103,6 @@ func _build() -> void:
 	_add_wheel("WheelFR", Vector3(-half_track, attach_y, axle), true, false)
 	_add_wheel("WheelRL", Vector3(half_track, attach_y, -axle), false, true)
 	_add_wheel("WheelRR", Vector3(-half_track, attach_y, -axle), false, true)
-
-
-func _build_windows(body_height: float) -> void:
-	var glass := StandardMaterial3D.new()
-	glass.albedo_color = Color(0.15, 0.22, 0.3)
-	glass.metallic = 0.3
-	glass.roughness = 0.15
-	var strip_y := BODY_CLEARANCE + body_height * 0.68
-	for side in [1.0, -1.0]:
-		var window := MeshInstance3D.new()
-		var mesh := BoxMesh.new()
-		mesh.size = Vector3(0.04, body_height * 0.32, spec.length * 0.86)
-		mesh.material = glass
-		window.mesh = mesh
-		window.position = Vector3(side * (spec.width / 2.0 + 0.01), strip_y, -0.1)
-		add_child(window)
-	var windscreen := MeshInstance3D.new()
-	var front := BoxMesh.new()
-	front.size = Vector3(spec.width * 0.9, body_height * 0.42, 0.04)
-	front.material = glass
-	windscreen.mesh = front
-	windscreen.name = "Windscreen"
-	windscreen.position = Vector3(0, BODY_CLEARANCE + body_height * 0.66, spec.length / 2.0 + 0.01)
-	add_child(windscreen)
 
 
 ## Front passenger door on the kerb (right, -X) side; it slides back to open.
@@ -404,6 +375,19 @@ func _add_wheel(wheel_name: String, at: Vector3, steering: bool, traction: bool)
 	tyre.mesh = cylinder
 	tyre.rotation = Vector3(0, 0, PI / 2.0)
 	wheel.add_child(tyre)
+	var hub := MeshInstance3D.new()
+	var hub_mesh := CylinderMesh.new()
+	hub_mesh.top_radius = WHEEL_RADIUS * 0.55
+	hub_mesh.bottom_radius = WHEEL_RADIUS * 0.55
+	hub_mesh.height = 0.37
+	var steel := StandardMaterial3D.new()
+	steel.albedo_color = Color(0.75, 0.76, 0.78)
+	steel.metallic = 0.8
+	steel.roughness = 0.3
+	hub_mesh.material = steel
+	hub.mesh = hub_mesh
+	hub.rotation = Vector3(0, 0, PI / 2.0)
+	wheel.add_child(hub)
 	add_child(wheel)
 
 
@@ -437,14 +421,14 @@ func set_wear(amount: float) -> void:
 
 
 func body_color() -> Color:
-	return (_body_mesh.material_override as StandardMaterial3D).albedo_color
+	return body.paint_material.albedo_color
 
 
+## All painted panels share one material, so paint and wear update in one place.
 func _update_body_material() -> void:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = _paint.lerp(Color(0.25, 0.22, 0.2), _wear * 0.7)
-	material.roughness = lerpf(0.45, 0.95, _wear)
-	_body_mesh.material_override = material
+	body.paint_material.albedo_color = _paint.lerp(Color(0.25, 0.22, 0.2), _wear * 0.7)
+	body.paint_material.roughness = lerpf(0.32, 0.95, _wear)
+	body.paint_material.metallic = lerpf(0.35, 0.05, _wear)
 
 
 ## Signed speed along the bus's forward axis in m/s (negative when reversing).

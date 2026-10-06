@@ -7,6 +7,7 @@ enum Mode { CHASE, DRIVER, TOP_DOWN }
 const ORDER := [Mode.CHASE, Mode.DRIVER, Mode.TOP_DOWN]
 const NAMES := {Mode.CHASE: "Chase", Mode.DRIVER: "Driver", Mode.TOP_DOWN: "Top-down"}
 const TOP_DOWN_HEIGHT := 38.0
+const DRIVER_EYE_MAX := 2.35
 
 
 static func next(mode: Mode) -> Mode:
@@ -39,5 +40,7 @@ static func camera_transform(mode: Mode, bus_xform: Transform3D, spec: BusSpec) 
 
 
 ## Driver's eye point in bus-local space (left-hand drive: +X is the bus's left).
+## Drivers sit low at the front, even in a double decker.
 static func driver_seat(spec: BusSpec) -> Vector3:
-	return Vector3(spec.width / 2.0 - 0.6, spec.height * 0.78, spec.length / 2.0 - 1.1)
+	var eye_height := minf(spec.height * 0.78, DRIVER_EYE_MAX)
+	return Vector3(spec.width / 2.0 - 0.6, eye_height, spec.length / 2.0 - 1.1)

@@ -63,3 +63,29 @@ func test_panel_hits_show_on_the_body() -> void:
 func test_mirror_refresh_option_is_passed_to_rig() -> void:
 	await _start({"mirror_refresh": 2})
 	assert_eq(session.mirrors.refresh_interval, 2)
+
+
+func test_mirror_views_do_not_cover_touch_controls_or_hud() -> void:
+	await _start()
+	session.camera_rig.set_mode(CameraModes.Mode.DRIVER)
+	await wait_process_frames(2)
+	var tc := session.touch_controls
+	var widgets: Array[Control] = [
+		tc.wheel,
+		tc.gas,
+		tc.brake_pedal,
+		tc.camera_button,
+		tc.horn_button,
+		tc.menu_button,
+		tc.indicator_left_button,
+		tc.indicator_right_button
+	]
+	var info := session.hud.info.get_global_rect()
+	for view in session.mirror_panel.views.values():
+		var mirror := (view as Control).get_global_rect()
+		assert_false(mirror.intersects(info), "%s covers the HUD text" % view.name)
+		for widget in widgets:
+			assert_false(
+				mirror.intersects(widget.get_global_rect()),
+				"%s covers %s" % [view.name, widget.name]
+			)

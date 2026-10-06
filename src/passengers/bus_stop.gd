@@ -51,8 +51,9 @@ func _build(track: Track) -> void:
 	plane.size = Vector2(Track.LANE_WIDTH - 0.4, ZONE_LENGTH)
 	var paint := StandardMaterial3D.new()
 	paint.albedo_color = (
-		Color(1.0, 0.8, 0.1, 0.55) if not is_terminal else Color(0.2, 0.7, 1.0, 0.55)
+		Color(1.0, 0.8, 0.1, 0.3) if not is_terminal else Color(0.3, 0.65, 1.0, 0.3)
 	)
+	paint.roughness = 0.7
 	paint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	plane.material = paint
 	marking.mesh = plane
@@ -102,16 +103,40 @@ func set_waiting(count: int) -> void:
 	for child in _figures.get_children():
 		child.free()
 	for i in mini(count, MAX_FIGURES):
-		var figure := MeshInstance3D.new()
-		var capsule := CapsuleMesh.new()
-		capsule.radius = 0.25
-		capsule.height = 1.7
-		var cloth := StandardMaterial3D.new()
-		cloth.albedo_color = Color.from_hsv(fmod(i * 0.17 + stop_index * 0.31, 1.0), 0.6, 0.85)
-		capsule.material = cloth
-		figure.mesh = capsule
-		figure.position = Vector3(0.0, 0.85, -2.0 + i * 0.45)
-		_figures.add_child(figure)
+		_figures.add_child(_person(i))
+
+
+## A simple standing person: legs, coat and head, in muted everyday colours.
+func _person(i: int) -> Node3D:
+	var person := Node3D.new()
+	person.position = Vector3(0.0, 0.0, -2.0 + i * 0.45)
+	var coat_colors := [
+		Color(0.2, 0.25, 0.35),
+		Color(0.45, 0.2, 0.18),
+		Color(0.3, 0.35, 0.25),
+		Color(0.55, 0.5, 0.42),
+		Color(0.15, 0.15, 0.17),
+		Color(0.6, 0.45, 0.2),
+	]
+	var skin_tones := [Color(0.95, 0.8, 0.68), Color(0.75, 0.55, 0.4), Color(0.45, 0.3, 0.2)]
+	var parts := [
+		[CapsuleMesh.new(), 0.13, 0.85, 0.42, Color(0.12, 0.13, 0.16)],
+		[CapsuleMesh.new(), 0.24, 0.8, 1.1, coat_colors[(i + stop_index * 2) % coat_colors.size()]],
+		[SphereMesh.new(), 0.13, 0.26, 1.65, skin_tones[(i * 7 + stop_index) % skin_tones.size()]],
+	]
+	for part in parts:
+		var mesh: PrimitiveMesh = part[0]
+		mesh.set("radius", part[1])
+		mesh.set("height", part[2])
+		var material := StandardMaterial3D.new()
+		material.albedo_color = part[4]
+		material.roughness = 0.9
+		mesh.material = material
+		var instance := MeshInstance3D.new()
+		instance.mesh = mesh
+		instance.position.y = part[3]
+		person.add_child(instance)
+	return person
 
 
 func figure_count() -> int:

@@ -168,4 +168,5 @@ static func pines() -> MapDef:
 	map.tree_color = Color(0.1, 0.3, 0.15)
 	map.sun_elevation = 20.0
 	map.night = true
+	map.conifers = true
 	return map

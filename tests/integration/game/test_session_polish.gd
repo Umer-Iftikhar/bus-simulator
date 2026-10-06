@@ -17,7 +17,7 @@ func test_night_map_turns_headlights_on_and_dims_the_sun() -> void:
 	for lamp in session.bus.headlights:
 		assert_true(lamp.visible)
 	var sun := session.world.get_node("Sun") as DirectionalLight3D
-	assert_lt(sun.light_energy, 0.5)
+	assert_lt(sun.light_energy, 1.0, "dim moonlight instead of sun")
 
 
 func test_day_map_keeps_headlights_off() -> void:

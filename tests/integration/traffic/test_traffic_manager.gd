@@ -133,3 +133,14 @@ func test_nearest_ahead() -> void:
 	_car(1, 30.0, 0.0, 0.0)
 	assert_eq(traffic.nearest_ahead(bus.global_position, 0, 200.0), near)
 	assert_null(traffic.nearest_ahead(bus.global_position, 0, 20.0))
+
+
+func test_cars_have_glowing_head_and_tail_lights() -> void:
+	var car := _car(0, 100.0, 0.0, 0.0)
+	var glowing := 0
+	for child in car.get_children():
+		if child is MeshInstance3D:
+			var material := (child as MeshInstance3D).mesh.surface_get_material(0)
+			if material is StandardMaterial3D and (material as StandardMaterial3D).emission_enabled:
+				glowing += 1
+	assert_eq(glowing, 4, "two headlights, two tail lights")
