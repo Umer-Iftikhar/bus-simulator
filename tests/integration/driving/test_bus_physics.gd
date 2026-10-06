@@ -110,9 +110,18 @@ func test_brake_factor_shortens_stopping_distance() -> void:
 	assert_lt(distances[1], distances[0])
 
 
-func test_holding_brake_at_standstill_reverses_slowly() -> void:
+func test_holding_brake_at_standstill_holds_the_bus() -> void:
 	var bus := await world.spawn_bus(self)
+	var start := bus.global_position
 	bus.set_command(0.0, 1.0, 0.0)
+	await wait_seconds(4.0)
+	assert_lt(bus.global_position.distance_to(start), 0.2, "brake holds, no creeping")
+
+
+func test_reverse_gear_drives_backwards_slowly() -> void:
+	var bus := await world.spawn_bus(self)
+	assert_true(bus.set_reverse(true))
+	bus.set_command(1.0, 0.0, 0.0)
 	await wait_seconds(6.0)
 	assert_lt(bus.forward_speed(), -1.0, "moving backwards")
 	assert_ge(bus.forward_speed(), -Drivetrain.REVERSE_TOP_SPEED * 1.05, "reverse is slow")

@@ -8,6 +8,8 @@ const ORDER := [Mode.CHASE, Mode.DRIVER, Mode.TOP_DOWN]
 const NAMES := {Mode.CHASE: "Chase", Mode.DRIVER: "Driver", Mode.TOP_DOWN: "Top-down"}
 const TOP_DOWN_HEIGHT := 38.0
 const DRIVER_EYE_MAX := 2.35
+## How far below eye level the driver camera looks, 12 m ahead (~8 degrees).
+const DRIVER_LOOK_DROP := 1.7
 
 
 static func next(mode: Mode) -> Mode:
@@ -25,7 +27,8 @@ static func camera_transform(mode: Mode, bus_xform: Transform3D, spec: BusSpec) 
 	match mode:
 		Mode.DRIVER:
 			var eye := bus_xform * driver_seat(spec)
-			var look := eye + forward * 12.0 + Vector3.DOWN * 0.8
+			# Tilted down a little so the dashboard and wheel sit in the lower view.
+			var look := eye + forward * 12.0 + bus_xform.basis.y * -DRIVER_LOOK_DROP
 			return Transform3D(Basis(), eye).looking_at(look, Vector3.UP)
 		Mode.TOP_DOWN:
 			var flat_forward := Vector3(forward.x, 0.0, forward.z).normalized()
@@ -43,4 +46,4 @@ static func camera_transform(mode: Mode, bus_xform: Transform3D, spec: BusSpec) 
 ## Drivers sit low at the front, even in a double decker.
 static func driver_seat(spec: BusSpec) -> Vector3:
 	var eye_height := minf(spec.height * 0.78, DRIVER_EYE_MAX)
-	return Vector3(spec.width / 2.0 - 0.6, eye_height, spec.length / 2.0 - 1.1)
+	return Vector3(spec.width / 2.0 - 0.6, eye_height, spec.length / 2.0 - 1.25)

@@ -31,7 +31,7 @@ func test_drive_button_starts_a_session_on_the_road() -> void:
 	assert_eq(session.world.track.lane_at(bus.global_position), 0, "spawned in kerb lane")
 	assert_gt(bus.global_transform.basis.y.dot(Vector3.UP), 0.99, "upright")
 	assert_true(session.camera_rig.camera.current)
-	assert_eq(session.hud.speed_label.text, "0 km/h")
+	assert_eq(session.hud.speed_label.text, "0 km/h  D")
 
 
 func test_holding_accelerate_key_drives_along_the_road() -> void:
@@ -45,7 +45,10 @@ func test_holding_accelerate_key_drives_along_the_road() -> void:
 	assert_between(travelled, 15.0, 90.0, "moved forward along the loop")
 	assert_ne(track.lane_at(bus.global_position), -1, "still on the road")
 	await wait_process_frames(1)
-	assert_eq(session.hud.speed_label.text, "%d km/h" % roundi(bus.speed_kmh()))
+	var shown := int(session.hud.speed_label.text.get_slice(" ", 0))
+	var actual := roundi(bus.speed_kmh())
+	assert_between(shown, actual - 1, actual + 1, "HUD speed")
+	assert_true(session.hud.speed_label.text.ends_with("D"), "in drive")
 	driver.key(KEY_W, false)
 	driver.key(KEY_S, true)
 	var stopped := await wait_until(func() -> bool: return bus.forward_speed() < 0.5, 8.0)

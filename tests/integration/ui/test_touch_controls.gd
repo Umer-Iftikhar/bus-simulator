@@ -38,6 +38,8 @@ func test_layout_keeps_every_control_on_screen_without_overlap() -> void:
 		controls.menu_button,
 		controls.indicator_left_button,
 		controls.indicator_right_button,
+		controls.gear_button,
+		controls.lights_button,
 	]
 	for widget in widgets:
 		var rect := Rect2(widget.position, widget.size)
@@ -121,6 +123,19 @@ func test_indicator_buttons_emit_and_light() -> void:
 	controls.show_indicators(true, false)
 	assert_true(controls.indicator_left_button.lit)
 	assert_false(controls.indicator_right_button.lit)
+
+
+func test_gear_and_light_buttons() -> void:
+	watch_signals(controls)
+	_touch(controls.gear_button, Vector2(5, 5), true)
+	_touch(controls.lights_button, Vector2(5, 5), true, 1)
+	assert_signal_emitted(controls, "gear_requested")
+	assert_signal_emitted(controls, "lights_requested")
+	controls.show_gear(true)
+	assert_eq(controls.gear_button.label, "R")
+	assert_true(controls.gear_button.lit)
+	controls.show_gear(false)
+	assert_eq(controls.gear_button.label, "D")
 
 
 func test_hidden_button_releases_its_hold() -> void:

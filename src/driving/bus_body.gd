@@ -13,6 +13,15 @@ const ROOF := 0.14
 const BELT := 0.38
 const PILLAR_SPACING := 1.5
 const SEAT_PITCH := 0.85
+const WINDSCREEN_BELOW_EYE := 0.85
+## Cockpit layout relative to the driver's eye (metres).
+const DASH_BELOW_EYE := 0.5
+const DASH_AHEAD_OF_EYE := 0.62
+const WHEEL_BELOW_EYE := 0.5
+const WHEEL_AHEAD_OF_EYE := 0.5
+const SPEEDO_MAX_KMH := 120.0
+## Steering wheel turns per side at full lock.
+const WHEEL_LOCK_TURNS := 0.4
 
 var spec: BusSpec
 var clearance := 0.55
@@ -22,6 +31,20 @@ var trim_material := StandardMaterial3D.new()
 var painted: Array[MeshInstance3D] = []
 var glass: Array[MeshInstance3D] = []
 var seats: MultiMeshInstance3D
+var head_material := _emissive(Color(1.0, 0.98, 0.9), 0.6)
+var tail_material := _emissive(Color(0.9, 0.05, 0.05), 0.4)
+var reverse_material := _emissive(Color(1.0, 1.0, 1.0), 0.0)
+var gauge_glow := _emissive(Color(0.08, 0.09, 0.1), 0.2)
+var gauge_ring := _emissive(Color(0.9, 0.9, 0.85), 0.8)
+var arrow_off := _emissive(Color(0.05, 0.25, 0.05), 0.0)
+var arrow_on := _emissive(Color(0.2, 1.0, 0.2), 3.0)
+## Rotates with the steering input (spins around its local Z axis).
+var steering_wheel: Node3D
+var speed_needle: Node3D
+var rpm_needle: Node3D
+var dash_arrows := {}
+var gear_label: Label3D
+var cabin_light: OmniLight3D
 
 
 static func create(bus_spec: BusSpec, body_clearance: float) -> BusBody:
@@ -36,6 +59,13 @@ static func create(bus_spec: BusSpec, body_clearance: float) -> BusBody:
 ## Height of the window bottoms (bus-local).
 func belt_line() -> float:
 	return clearance + (spec.height - clearance) * BELT
+
+
+## Bottom of the windscreen: never above the side windows, and always well
+## below the driver's eye so the road just ahead stays visible (deep
+## windscreens, even on a double decker).
+func windscreen_bottom() -> float:
+	return minf(belt_line(), CameraModes.driver_seat(spec).y - WINDSCREEN_BELOW_EYE)
 
 
 func _build() -> void:
@@ -71,7 +101,8 @@ func _build_shell() -> void:
 	_paint_box(
 		"SkirtRight", Vector3(PANEL, lower_h, spec.length), Vector3(-hw + PANEL / 2, lower_y, 0)
 	)
-	_paint_box("FrontPanel", Vector3(w, lower_h, PANEL), Vector3(0, lower_y, hl - PANEL / 2))
+	var wb := windscreen_bottom()
+	_paint_box("FrontPanel", Vector3(w, wb - c, PANEL), Vector3(0, (c + wb) / 2.0, hl - PANEL / 2))
 	_paint_box("RearPanel", Vector3(w, lower_h, PANEL), Vector3(0, lower_y, -hl + PANEL / 2))
 	_paint_box("Roof", Vector3(w, ROOF, spec.length), Vector3(0, h - ROOF / 2.0, 0))
 	if h > 4.0:
@@ -93,7 +124,10 @@ func _build_shell() -> void:
 	_glass_box(
 		"GlassRight", Vector3(0.02, window_h, spec.length - 0.1), Vector3(-hw + 0.03, window_y, 0)
 	)
-	_glass_box("Windscreen", Vector3(w - 0.06, window_h, 0.02), Vector3(0, window_y, hl - 0.03))
+	var screen_h := h - ROOF - wb
+	_glass_box(
+		"Windscreen", Vector3(w - 0.06, screen_h, 0.02), Vector3(0, wb + screen_h / 2.0, hl - 0.03)
+	)
 	_glass_box("RearWindow", Vector3(w - 0.06, window_h, 0.02), Vector3(0, window_y, -hl + 0.03))
 
 	# Pillars: corner posts plus regular posts along both sides.
@@ -120,9 +154,15 @@ func _build_details() -> void:
 	var c := clearance
 	for z in [hl + 0.04, -hl - 0.04]:
 		_trim_box("Bumper", Vector3(spec.width + 0.04, 0.3, 0.12), Vector3(0, c + 0.15, z))
-	var head := _emissive(Color(1.0, 0.98, 0.9), 1.5)
-	var tail := _emissive(Color(0.9, 0.05, 0.05), 1.2)
+	var head := head_material
+	var tail := tail_material
 	for side in [1.0, -1.0]:
+		_box(
+			"ReverseLight",
+			Vector3(0.14, 0.12, 0.03),
+			Vector3(side * (hw - 0.45), c + 0.6, -hl - 0.01),
+			reverse_material
+		)
 		_box(
 			"HeadlightLens",
 			Vector3(0.34, 0.18, 0.03),
@@ -183,19 +223,8 @@ func _build_interior() -> void:
 		Vector3(0, c + 0.05, 0),
 		floor_material
 	)
-	_trim_box("Dashboard", Vector3(spec.width - 0.15, 0.32, 0.55), Vector3(0, yb - 0.14, hl - 0.34))
-
 	var seat := CameraModes.driver_seat(spec)
-	var wheel := MeshInstance3D.new()
-	wheel.name = "SteeringWheel"
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.17
-	torus.outer_radius = 0.21
-	torus.material = trim_material
-	wheel.mesh = torus
-	wheel.position = Vector3(seat.x, seat.y - 0.62, seat.z + 0.42)
-	wheel.rotation = Vector3(deg_to_rad(60.0), 0, 0)
-	add_child(wheel)
+	_build_cockpit(seat, yb)
 
 	var fabric := StandardMaterial3D.new()
 	fabric.albedo_color = Color(0.12, 0.2, 0.42)
@@ -233,6 +262,175 @@ func _build_interior() -> void:
 	seats.name = "Seats"
 	seats.multimesh = multimesh
 	add_child(seats)
+
+
+## Dashboard, gauge cluster and steering wheel, raised into the driver's
+## lower field of view so they are visible from the driver's-seat camera.
+func _build_cockpit(eye: Vector3, yb: float) -> void:
+	var hl := spec.length / 2.0
+	var dash_top := eye.y - DASH_BELOW_EYE
+	var dash_back := eye.z + DASH_AHEAD_OF_EYE
+	var dash_front := hl - 0.12
+	var dash_bottom := yb - 0.3
+	var dash := StandardMaterial3D.new()
+	dash.albedo_color = Color(0.13, 0.13, 0.14)
+	dash.roughness = 0.75
+	_box(
+		"Dashboard",
+		Vector3(spec.width - 0.15, dash_top - dash_bottom, dash_front - dash_back),
+		Vector3(0, (dash_top + dash_bottom) / 2.0, (dash_front + dash_back) / 2.0),
+		dash
+	)
+	# Instrument cluster: a hooded panel facing the driver.
+	var cluster := Node3D.new()
+	cluster.name = "Cluster"
+	add_child(cluster)
+	cluster.position = Vector3(eye.x, dash_top + 0.1, dash_back + 0.12)
+	_face(cluster, eye)
+	var panel := _child_box(cluster, "ClusterPanel", Vector3(0.44, 0.17, 0.04), Vector3.ZERO, dash)
+	panel.position.z = 0.02
+	speed_needle = _gauge(cluster, "Speedometer", Vector3(-0.11, 0.0, 0.0))
+	rpm_needle = _gauge(cluster, "Tachometer", Vector3(0.11, 0.0, 0.0))
+	for side in ["left", "right"]:
+		var x := -0.035 if side == "left" else 0.035
+		var arrow := _child_box(
+			cluster,
+			"DashArrow_" + side,
+			Vector3(0.025, 0.018, 0.01),
+			Vector3(x, 0.06, -0.01),
+			arrow_off
+		)
+		dash_arrows[side] = arrow
+	gear_label = Label3D.new()
+	gear_label.name = "GearDisplay"
+	gear_label.text = "D"
+	gear_label.font_size = 64
+	gear_label.pixel_size = 0.0005
+	gear_label.modulate = Color(1.0, 0.6, 0.1)
+	gear_label.shaded = false
+	gear_label.double_sided = false
+	gear_label.position = Vector3(0, -0.045, -0.012)
+	gear_label.rotation = Vector3(0, PI, 0)
+	cluster.add_child(gear_label)
+	# Steering wheel on its column, between the driver and the cluster.
+	var column := Node3D.new()
+	column.name = "SteeringColumn"
+	add_child(column)
+	column.position = Vector3(eye.x, eye.y - WHEEL_BELOW_EYE, eye.z + WHEEL_AHEAD_OF_EYE)
+	_face(column, eye)
+	steering_wheel = Node3D.new()
+	steering_wheel.name = "SteeringWheel"
+	column.add_child(steering_wheel)
+	var rim := MeshInstance3D.new()
+	rim.name = "Rim"
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.18
+	torus.outer_radius = 0.215
+	torus.material = trim_material
+	rim.mesh = torus
+	rim.rotation = Vector3(PI / 2.0, 0, 0)
+	steering_wheel.add_child(rim)
+	for angle in [0.0, PI / 2.0, PI]:
+		var spoke := _child_box(
+			steering_wheel, "Spoke", Vector3(0.19, 0.03, 0.02), Vector3.ZERO, trim_material
+		)
+		spoke.rotation = Vector3(0, 0, angle)
+		spoke.position = Vector3(cos(angle), sin(angle), 0) * -0.095
+	var hub := _child_box(steering_wheel, "Hub", Vector3(0.09, 0.09, 0.05), Vector3.ZERO, dash)
+	hub.position.z = 0.01
+	_child_box(column, "Column", Vector3(0.06, 0.06, 0.35), Vector3(0, 0, 0.2), trim_material)
+	cabin_light = OmniLight3D.new()
+	cabin_light.name = "CabinLight"
+	cabin_light.position = Vector3(0, spec.height - ROOF - 0.15, 0)
+	cabin_light.omni_range = spec.length * 0.6
+	cabin_light.light_energy = 0.7
+	cabin_light.light_color = Color(1.0, 0.95, 0.85)
+	cabin_light.shadow_enabled = false
+	cabin_light.visible = false
+	add_child(cabin_light)
+
+
+## A round gauge (dial + needle) in [param parent]'s XY plane. Returns the needle pivot.
+func _gauge(parent: Node3D, gauge_name: String, at: Vector3) -> Node3D:
+	var dial := MeshInstance3D.new()
+	dial.name = gauge_name
+	var disc := CylinderMesh.new()
+	disc.top_radius = 0.06
+	disc.bottom_radius = 0.06
+	disc.height = 0.01
+	disc.material = gauge_glow
+	dial.mesh = disc
+	dial.rotation = Vector3(PI / 2.0, 0, 0)
+	dial.position = at
+	parent.add_child(dial)
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.058
+	torus.outer_radius = 0.066
+	torus.material = gauge_ring
+	ring.mesh = torus
+	ring.rotation = Vector3(PI / 2.0, 0, 0)
+	ring.position = at + Vector3(0, 0, -0.006)
+	parent.add_child(ring)
+	var pivot := Node3D.new()
+	pivot.name = gauge_name + "Needle"
+	pivot.position = at + Vector3(0, 0, -0.01)
+	parent.add_child(pivot)
+	var needle_material := _emissive(Color(1.0, 0.25, 0.1), 1.5)
+	_child_box(pivot, "Needle", Vector3(0.008, 0.05, 0.004), Vector3(0, 0.025, 0), needle_material)
+	return pivot
+
+
+## Points [param node]'s -Z axis at [param target] (both bus-local).
+static func _face(node: Node3D, target: Vector3) -> void:
+	node.transform = Transform3D(Basis(), node.position).looking_at(target, Vector3.UP)
+
+
+func _child_box(
+	parent: Node3D, box_name: String, size: Vector3, at: Vector3, material: Material
+) -> MeshInstance3D:
+	var instance := MeshInstance3D.new()
+	instance.name = box_name
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	instance.mesh = mesh
+	instance.material_override = material
+	instance.position = at
+	parent.add_child(instance)
+	return instance
+
+
+## Live dashboard: speedometer, rev counter, steering wheel, indicator arrows, gear.
+func update_dashboard(
+	speed_kmh: float, steer: float, throttle: float, left_on: bool, right_on: bool, reverse: bool
+) -> void:
+	speed_needle.rotation.z = needle_angle(speed_kmh / SPEEDO_MAX_KMH)
+	var revs := clampf(0.25 + throttle * 0.45 + speed_kmh / SPEEDO_MAX_KMH * 0.3, 0.0, 1.0)
+	rpm_needle.rotation.z = needle_angle(revs)
+	steering_wheel.rotation.z = -steer * WHEEL_LOCK_TURNS * TAU
+	(dash_arrows["left"] as MeshInstance3D).material_override = arrow_on if left_on else arrow_off
+	(dash_arrows["right"] as MeshInstance3D).material_override = arrow_on if right_on else arrow_off
+	gear_label.text = "R" if reverse else "D"
+
+
+## Needle rotation for a 0..1 reading: sweeps 270 degrees clockwise.
+static func needle_angle(fraction: float) -> float:
+	return deg_to_rad(135.0) - clampf(fraction, 0.0, 1.0) * deg_to_rad(270.0)
+
+
+## Exterior and cabin lights. [param braking]/[param reverse] drive the rear lamps.
+func set_lights(headlights_on: bool, braking: bool, reverse: bool) -> void:
+	head_material.emission_energy_multiplier = 4.0 if headlights_on else 0.6
+	var tail_energy := 0.4
+	if headlights_on:
+		tail_energy = 1.5
+	if braking:
+		tail_energy = 6.0
+	tail_material.emission_energy_multiplier = tail_energy
+	reverse_material.emission_energy_multiplier = 5.0 if reverse else 0.0
+	reverse_material.albedo_color = Color(1, 1, 1) if reverse else Color(0.6, 0.6, 0.6)
+	gauge_glow.emission_energy_multiplier = 1.2 if headlights_on else 0.4
+	cabin_light.visible = headlights_on
 
 
 func _box(box_name: String, size: Vector3, at: Vector3, material: Material) -> MeshInstance3D:

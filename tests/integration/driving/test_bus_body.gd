@@ -34,8 +34,8 @@ func test_painted_panels_share_one_material_that_tracks_paint_and_wear() -> void
 
 func test_interior_has_seats_wheel_and_dashboard() -> void:
 	var bus := _bus()
-	for part in ["Floor", "Dashboard", "SteeringWheel", "DriverSeat"]:
-		assert_not_null(bus.body.get_node_or_null(part), part)
+	for part in ["Floor", "Dashboard", "SteeringWheel", "DriverSeat", "Cluster"]:
+		assert_not_null(bus.body.find_child(part, true, false), part)
 	assert_gt(bus.body.seats.multimesh.instance_count, 12, "rows of passenger seats")
 
 
