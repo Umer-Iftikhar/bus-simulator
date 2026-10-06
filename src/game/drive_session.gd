@@ -8,6 +8,7 @@ extends Node3D
 ##   "seed": int seed for passengers and traffic (random when absent)
 ##   "damage": DamageModel dictionary the bus starts with (default pristine)
 ##   "traffic": bool, spawn AI traffic (default true)
+##   "mirror_refresh": int, render mirrors every Nth frame (default 1)
 
 signal run_finished(result: Dictionary)
 signal exit_requested
@@ -26,6 +27,8 @@ var run: RunController
 var damage: DamageModel
 var traffic: TrafficManager
 var indicators := Indicators.new()
+var mirrors: MirrorRig
+var mirror_panel: MirrorPanel
 var ui: CanvasLayer
 var hud: Hud
 var touch_controls: TouchControls
@@ -51,6 +54,8 @@ func _ready() -> void:
 	_apply_performance(options.get("performance", {}))
 	horn = Horn.new()
 	bus.add_child(horn)
+	mirrors = MirrorRig.create(bus, options.get("mirror_refresh", 1))
+	bus.add_child(mirrors)
 
 	camera_rig = CameraRig.new()
 	camera_rig.target = bus
@@ -72,6 +77,9 @@ func _ready() -> void:
 	add_child(ui)
 	hud = Hud.new()
 	ui.add_child(hud)
+	mirror_panel = MirrorPanel.new()
+	mirror_panel.visible = false
+	ui.add_child(mirror_panel)
 	touch_controls = TouchControls.new()
 	ui.add_child(touch_controls)
 
@@ -84,6 +92,7 @@ func _ready() -> void:
 	player_input.horn_requested.connect(horn.honk)
 	player_input.pause_requested.connect(exit_requested.emit)
 	camera_rig.mode_changed.connect(hud.show_camera_mode)
+	camera_rig.mode_changed.connect(_on_camera_mode_changed)
 	player_input.indicator_left_requested.connect(
 		func() -> void: indicators.toggle_left(current_lane())
 	)
@@ -95,9 +104,11 @@ func _ready() -> void:
 	run.run_finished.connect(_on_run_finished)
 	bus.impact.connect(_on_impact)
 	damage.changed.connect(_on_damage_changed)
+	damage.part_damaged.connect(bus.set_part_health)
 	damage.mirror_shattered.connect(_on_mirror_shattered)
 	damage.wrecked.connect(_on_wrecked)
 	_on_damage_changed()
+	_show_initial_damage()
 	_refresh_hud()
 
 
@@ -152,7 +163,28 @@ func _on_damage_changed() -> void:
 	hud.show_health(damage.health_percent())
 
 
+func _show_initial_damage() -> void:
+	for part in DamageModel.PARTS:
+		bus.set_part_health(part, damage.health(part))
+	for part in DamageModel.MIRRORS:
+		_show_mirror(part)
+	mirror_panel.bind(mirrors)
+
+
+func _show_mirror(part: String) -> void:
+	var is_broken := damage.is_mirror_broken(part)
+	mirrors.set_broken(part, is_broken)
+	mirror_panel.set_broken(part, is_broken)
+	bus.set_mirror_image(part, mirrors.texture(part), is_broken)
+
+
+## Mirrors matter most from the driver's seat, so the mirror views show there.
+func _on_camera_mode_changed(mode: CameraModes.Mode) -> void:
+	mirror_panel.visible = mode == CameraModes.Mode.DRIVER
+
+
 func _on_mirror_shattered(part: String) -> void:
+	_show_mirror(part)
 	hud.flash("%s mirror smashed!" % ("Left" if part == DamageModel.MIRROR_LEFT else "Right"))
 
 

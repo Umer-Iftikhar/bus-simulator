@@ -144,8 +144,7 @@ func test_loaded_wreck_is_known_wrecked_without_signal() -> void:
 	assert_signal_not_emitted(wreck, "wrecked")
 
 
-func test_contact_normal_decides_the_face() -> void:
-	var mid := Vector3(0.0, spec.height * 0.3, 0.0)
+func test_contact_normal_decides_the_panel() -> void:
 	# Normals point into the bus: a wall ahead pushes back (-Z), etc.
 	var cases := {
 		DamageModel.BODY_FRONT: Vector3(0, 0, -1),
@@ -154,39 +153,15 @@ func test_contact_normal_decides_the_face() -> void:
 		DamageModel.BODY_RIGHT: Vector3(1, 0, 0),
 	}
 	for part in cases:
-		assert_eq(DamageModel.part_for_contact(mid, cases[part], spec), part, part)
+		assert_eq(DamageModel.panel_for_normal(cases[part]), part, part)
 
 
-func test_corner_contacts_follow_the_normal_not_the_point() -> void:
-	var front_corner := Vector3(spec.width / 2.0 + 0.05, 0.6, spec.length / 2.0 - 0.05)
-	assert_eq(
-		DamageModel.part_for_contact(front_corner, Vector3(0, 0, -1), spec), DamageModel.BODY_FRONT
-	)
-	var rear_corner := Vector3(-spec.width / 2.0, 0.6, -spec.length / 2.0)
-	assert_eq(
-		DamageModel.part_for_contact(rear_corner, Vector3(0.3, 0, 0.9), spec), DamageModel.BODY_REAR
-	)
+func test_oblique_normals_pick_the_dominant_face() -> void:
+	assert_eq(DamageModel.panel_for_normal(Vector3(0.3, 0, -0.9)), DamageModel.BODY_FRONT)
+	assert_eq(DamageModel.panel_for_normal(Vector3(0.9, 0.2, 0.3)), DamageModel.BODY_RIGHT)
+	assert_eq(DamageModel.panel_for_normal(Vector3(-0.7, 0, 0.69)), DamageModel.BODY_LEFT)
 
 
-func test_high_side_hit_near_the_front_breaks_a_mirror() -> void:
-	var high_front_left := Vector3(spec.width / 2.0, spec.height * 0.8, spec.length / 2.0 - 0.3)
-	var high_front_right := Vector3(-spec.width / 2.0, spec.height * 0.8, spec.length / 2.0 - 0.3)
-	assert_eq(
-		DamageModel.part_for_contact(high_front_left, Vector3(-1, 0, 0), spec),
-		DamageModel.MIRROR_LEFT
-	)
-	assert_eq(
-		DamageModel.part_for_contact(high_front_right, Vector3(1, 0, 0), spec),
-		DamageModel.MIRROR_RIGHT
-	)
-
-
-func test_low_or_rearward_side_hits_are_body_panels() -> void:
-	var low_front := Vector3(-spec.width / 2.0, 0.6, spec.length / 2.0 - 0.3)
-	var high_middle := Vector3(-spec.width / 2.0, spec.height * 0.8, 0.0)
-	assert_eq(
-		DamageModel.part_for_contact(low_front, Vector3(1, 0, 0), spec), DamageModel.BODY_RIGHT
-	)
-	assert_eq(
-		DamageModel.part_for_contact(high_middle, Vector3(1, 0, 0), spec), DamageModel.BODY_RIGHT
-	)
+func test_hull_contacts_never_map_to_mirrors() -> void:
+	for normal in [Vector3(1, 0, 0), Vector3(-1, 0, 0), Vector3(0, 0, 1), Vector3(0.5, 0, -0.5)]:
+		assert_false(DamageModel.panel_for_normal(normal) in DamageModel.MIRRORS)

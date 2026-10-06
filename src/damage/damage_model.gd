@@ -37,8 +37,6 @@ const MIRROR_BREAK := 0.8
 const WRECK_THRESHOLD := 0.08
 ## Top speed left at the brink of being wrecked.
 const MIN_SPEED_FACTOR := 0.4
-## Mirror height band and how close to the front they sit (bus-local metres).
-const MIRROR_ZONE_DEPTH := 1.2
 
 var parts := {}
 var _was_wrecked := false
@@ -146,15 +144,11 @@ func repair_cost(bus_id: String) -> int:
 	return int(ceil(cost / 10.0)) * 10
 
 
-## Which part a contact belongs to, from the contact point and the contact
-## normal (pointing into the bus), both in bus-local coordinates (+Z forward,
-## +X left). The normal decides the face; the point decides mirror hits.
-static func part_for_contact(local_point: Vector3, local_normal: Vector3, spec: BusSpec) -> String:
+## Which body panel a hull contact belongs to, from the contact normal
+## (pointing into the bus) in bus-local coordinates (+Z forward, +X left).
+## Box contacts sit on the hull's corners, so the normal, not the point,
+## decides the face. Mirrors have their own sensors on the bus.
+static func panel_for_normal(local_normal: Vector3) -> String:
 	if absf(local_normal.z) >= absf(local_normal.x):
 		return BODY_FRONT if local_normal.z < 0.0 else BODY_REAR
-	var left_side := local_normal.x < 0.0
-	var near_front := local_point.z > spec.length / 2.0 - MIRROR_ZONE_DEPTH
-	var mirror_height := local_point.y > spec.height * 0.45
-	if near_front and mirror_height:
-		return MIRROR_LEFT if left_side else MIRROR_RIGHT
-	return BODY_LEFT if left_side else BODY_RIGHT
+	return BODY_LEFT if local_normal.x < 0.0 else BODY_RIGHT

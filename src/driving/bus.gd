@@ -18,6 +18,9 @@ const CENTER_OF_MASS_HEIGHT := 0.25
 ## Largest acceleration normal driving can produce (hard braking, full-lock
 ## turns); velocity changes beyond this between steps are collisions.
 const MAX_DRIVING_ACCEL := 14.0
+## How far the side mirror heads stick out beyond the body.
+const MIRROR_REACH := 0.35
+const MIRROR_HEAD := Vector3(0.12, 0.42, 0.26)
 
 var spec: BusSpec
 var input := DriveInput.new()
@@ -33,6 +36,8 @@ var brake_factor := 1.0
 var handling_factor := 1.0
 ## When false the bus ignores commands and holds the brakes (e.g. bus wrecked, run over).
 var controls_enabled := true
+## DamageModel mirror part -> MeshInstance3D showing the mirror glass.
+var mirror_glass := {}
 
 var _target_throttle := 0.0
 var _target_brake := 0.0
@@ -42,6 +47,8 @@ var _paint := Color.WHITE
 var _wear := 0.0
 var _last_velocity := Vector3.ZERO
 var _lamps := {}
+var _mirror_sensors := {}
+var _panel_overlays := {}
 
 
 static func create(bus_spec: BusSpec) -> Bus:
@@ -83,6 +90,8 @@ func _build() -> void:
 	_build_windows(body_height)
 
 	_build_lamps()
+	_build_mirrors()
+	_build_panel_overlays(body_height)
 
 	var half_track := spec.width / 2.0 - 0.15
 	var axle := spec.wheelbase() / 2.0
@@ -115,6 +124,141 @@ func _build_windows(body_height: float) -> void:
 	windscreen.name = "Windscreen"
 	windscreen.position = Vector3(0, BODY_CLEARANCE + body_height * 0.66, spec.length / 2.0 + 0.01)
 	add_child(windscreen)
+
+
+## Bus-local centre of a side mirror head ([constant DamageModel.MIRROR_LEFT] or RIGHT).
+static func mirror_mount(bus_spec: BusSpec, part: String) -> Vector3:
+	var side := 1.0 if part == DamageModel.MIRROR_LEFT else -1.0
+	var x := side * (bus_spec.width / 2.0 + MIRROR_REACH - MIRROR_HEAD.x / 2.0)
+	return Vector3(x, bus_spec.height * 0.68, bus_spec.length / 2.0 - 0.35)
+
+
+## Side mirrors: an arm and head on each front corner, plus a sensor that
+## shatters the mirror when it clips something. Mirrors break away rather than
+## stopping the bus, so they are Area3D sensors, not solid collision shapes.
+func _build_mirrors() -> void:
+	var housing := StandardMaterial3D.new()
+	housing.albedo_color = Color(0.1, 0.1, 0.1)
+	for part in DamageModel.MIRRORS:
+		var mount := mirror_mount(spec, part)
+		var side := signf(mount.x)
+		var arm := MeshInstance3D.new()
+		arm.name = "MirrorArm_" + part
+		var arm_mesh := BoxMesh.new()
+		arm_mesh.size = Vector3(MIRROR_REACH, 0.05, 0.05)
+		arm_mesh.material = housing
+		arm.mesh = arm_mesh
+		arm.position = Vector3(
+			side * (spec.width / 2.0 + MIRROR_REACH / 2.0), mount.y + 0.15, mount.z
+		)
+		add_child(arm)
+		var head := MeshInstance3D.new()
+		head.name = "MirrorHead_" + part
+		var head_mesh := BoxMesh.new()
+		head_mesh.size = MIRROR_HEAD
+		head_mesh.material = housing
+		head.mesh = head_mesh
+		head.position = mount
+		add_child(head)
+		var glass := MeshInstance3D.new()
+		glass.name = "MirrorGlass_" + part
+		var quad := QuadMesh.new()
+		quad.size = Vector2(MIRROR_HEAD.x * 0.85, MIRROR_HEAD.y * 0.9)
+		glass.mesh = quad
+		# The quad faces -Z (backward), toward the driver.
+		glass.position = mount + Vector3(0, 0, -MIRROR_HEAD.z / 2.0 - 0.005)
+		glass.rotation = Vector3(0, PI, 0)
+		add_child(glass)
+		mirror_glass[part] = glass
+		set_mirror_image(part, null)
+
+		var sensor := Area3D.new()
+		sensor.name = "MirrorSensor_" + part
+		sensor.collision_layer = 0
+		sensor.collision_mask = Layers.WORLD | Layers.TRAFFIC
+		# Must stay monitorable: Godot treats non-monitorable areas as static in
+		# the broadphase, and static-static pairs (sensor vs building) never form.
+		sensor.monitorable = true
+		var sensor_shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = MIRROR_HEAD + Vector3(0.04, 0.04, 0.04)
+		sensor_shape.shape = box
+		sensor.add_child(sensor_shape)
+		sensor.position = mount
+		sensor.body_entered.connect(_on_mirror_touched.bind(part))
+		add_child(sensor)
+		_mirror_sensors[part] = sensor
+
+
+## Shows [param texture] (a mirror camera's view) on the mirror glass, flipped
+## like a real mirror; null shows dark glass. [param broken] shows cracked glass.
+func set_mirror_image(part: String, texture: Texture2D, broken := false) -> void:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	if broken:
+		material.albedo_color = Color(0.18, 0.18, 0.2)
+	elif texture != null:
+		material.albedo_texture = texture
+		material.uv1_scale = Vector3(-1, 1, 1)
+	else:
+		material.albedo_color = Color(0.45, 0.55, 0.65)
+	(mirror_glass[part] as MeshInstance3D).material_override = material
+
+
+func _on_mirror_touched(body: Node3D, part: String) -> void:
+	if body == self:
+		return
+	var other_velocity := Vector3.ZERO
+	if body is TrafficCar:
+		other_velocity = (body as TrafficCar).velocity()
+	var relative := (linear_velocity - other_velocity).length()
+	if relative >= DamageModel.MIRROR_BREAK:
+		impact.emit(part, relative)
+
+
+## Thin dark skins over each body panel; their opacity shows panel damage.
+func _build_panel_overlays(body_height: float) -> void:
+	var y := BODY_CLEARANCE + body_height / 2.0
+	var hl := spec.length / 2.0 + 0.015
+	var hw := spec.width / 2.0 + 0.015
+	var panels := {
+		DamageModel.BODY_FRONT:
+		[Vector3(0, y, hl), Vector3(spec.width * 0.96, body_height * 0.9, 0.01)],
+		DamageModel.BODY_REAR:
+		[Vector3(0, y, -hl), Vector3(spec.width * 0.96, body_height * 0.9, 0.01)],
+		DamageModel.BODY_LEFT:
+		[Vector3(hw, y, 0), Vector3(0.01, body_height * 0.9, spec.length * 0.96)],
+		DamageModel.BODY_RIGHT:
+		[Vector3(-hw, y, 0), Vector3(0.01, body_height * 0.9, spec.length * 0.96)],
+	}
+	for part in panels:
+		var overlay := MeshInstance3D.new()
+		overlay.name = "Dents_" + part
+		var box := BoxMesh.new()
+		box.size = panels[part][1]
+		overlay.mesh = box
+		overlay.position = panels[part][0]
+		add_child(overlay)
+		_panel_overlays[part] = overlay
+		set_part_health(part, 1.0)
+
+
+## Shows a panel's damage: grime and dents fade in as its health drops.
+func set_part_health(part: String, health: float) -> void:
+	if not _panel_overlays.has(part):
+		return
+	var overlay := _panel_overlays[part] as MeshInstance3D
+	var material := StandardMaterial3D.new()
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = Color(0.18, 0.14, 0.1, (1.0 - clampf(health, 0.0, 1.0)) * 0.75)
+	material.roughness = 1.0
+	overlay.material_override = material
+	overlay.visible = health < 1.0
+
+
+func panel_damage_alpha(part: String) -> float:
+	var overlay := _panel_overlays[part] as MeshInstance3D
+	return (overlay.material_override as StandardMaterial3D).albedo_color.a
 
 
 func _build_lamps() -> void:
@@ -263,8 +407,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		impulse_dv += impulse / mass
 		if impulse > best_impulse:
 			best_impulse = impulse
-			var local_point := to_local * state.get_contact_local_position(i)
-			best_part = DamageModel.part_for_contact(local_point, to_local.basis * normal, spec)
+			best_part = DamageModel.panel_for_normal(to_local.basis * normal)
 	if best_part.is_empty():
 		return
 	var strength := maxf(sudden, impulse_dv)
