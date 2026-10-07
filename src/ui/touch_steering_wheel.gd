@@ -3,7 +3,7 @@ extends Control
 ## On-screen steering wheel: drag around the rim to turn it; it springs back
 ## to centre when released. [member steer] is -1 (full left) .. 1 (full right).
 
-const RETURN_SPEED := 6.0
+const RETURN_SPEED := 10.0
 
 var max_angle := SteeringWheelMath.DEFAULT_MAX_ANGLE
 var wheel_angle := 0.0

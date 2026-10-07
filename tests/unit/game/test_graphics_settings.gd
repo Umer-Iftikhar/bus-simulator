@@ -2,7 +2,14 @@ extends TestCase
 ## Graphics quality presets.
 
 const KEYS := [
-	"shadows", "shadow_distance", "msaa", "render_scale", "glow", "view_distance", "mirror_refresh"
+	"shadows",
+	"shadow_distance",
+	"msaa",
+	"render_scale",
+	"glow",
+	"view_distance",
+	"mirror_refresh",
+	"texture_size",
 ]
 
 
@@ -26,6 +33,7 @@ func test_presets_get_strictly_better_from_low_to_ultra() -> void:
 			assert_gt(p["view_distance"], previous["view_distance"], preset)
 			assert_ge(p["msaa"], previous["msaa"], preset)
 			assert_le(p["mirror_refresh"], previous["mirror_refresh"], preset)
+			assert_ge(p["texture_size"], previous["texture_size"], preset)
 		previous = p
 
 
@@ -42,3 +50,12 @@ func test_unknown_preset_uses_default() -> void:
 		GraphicsSettings.profile("potato"), GraphicsSettings.profile(GraphicsSettings.DEFAULT)
 	)
 	assert_false(GraphicsSettings.is_valid("potato"))
+
+
+func test_texture_sizes_are_480_720_1080() -> void:
+	assert_eq(GraphicsSettings.profile("low")["texture_size"], 480)
+	assert_eq(GraphicsSettings.profile("medium")["texture_size"], 720)
+	assert_eq(GraphicsSettings.profile("high")["texture_size"], 1080)
+	assert_eq(GraphicsSettings.profile("ultra")["texture_size"], 1080)
+	for preset in GraphicsSettings.PRESETS:
+		assert_has(WorldLook.TEXTURE_SIZES, GraphicsSettings.profile(preset)["texture_size"])

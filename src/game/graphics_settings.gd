@@ -14,6 +14,7 @@ const NAMES := {
 const PROFILES := {
 	"low":
 	{
+		"texture_size": 480,
 		"shadows": false,
 		"shadow_distance": 0.0,
 		"msaa": Viewport.MSAA_DISABLED,
@@ -24,6 +25,7 @@ const PROFILES := {
 	},
 	"medium":
 	{
+		"texture_size": 720,
 		"shadows": true,
 		"shadow_distance": 70.0,
 		"msaa": Viewport.MSAA_DISABLED,
@@ -34,6 +36,7 @@ const PROFILES := {
 	},
 	"high":
 	{
+		"texture_size": 1080,
 		"shadows": true,
 		"shadow_distance": 140.0,
 		"msaa": Viewport.MSAA_2X,
@@ -44,6 +47,7 @@ const PROFILES := {
 	},
 	"ultra":
 	{
+		"texture_size": 1080,
 		"shadows": true,
 		"shadow_distance": 220.0,
 		"msaa": Viewport.MSAA_4X,

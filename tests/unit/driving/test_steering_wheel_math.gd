@@ -31,3 +31,27 @@ func test_angle_to_steer_maps_and_clamps() -> void:
 	assert_almost_eq(SteeringWheelMath.angle_to_steer(max_angle / 2, max_angle), 0.5, 0.0001)
 	assert_eq(SteeringWheelMath.angle_to_steer(-max_angle * 3, max_angle), -1.0)
 	assert_eq(SteeringWheelMath.angle_to_steer(1.0, 0.0), 0.0)
+
+
+func test_wheel_turns_two_full_turns_each_way_like_a_real_bus() -> void:
+	assert_almost_eq(SteeringWheelMath.DEFAULT_MAX_ANGLE, deg_to_rad(720.0), 0.0001)
+	# Hand over hand: a full circle of the pointer, done in small drags, twice.
+	var angle := 0.0
+	var pointer := 0.0
+	for i in 160:
+		var next := wrapf(pointer + 0.1, -PI, PI)
+		angle = SteeringWheelMath.accumulate(
+			angle, pointer, next, SteeringWheelMath.DEFAULT_MAX_ANGLE
+		)
+		pointer = next
+	assert_almost_eq(angle, SteeringWheelMath.DEFAULT_MAX_ANGLE, 0.0001, "stops at 720 degrees")
+	assert_almost_eq(
+		SteeringWheelMath.angle_to_steer(TAU, SteeringWheelMath.DEFAULT_MAX_ANGLE),
+		0.5,
+		0.0001,
+		"one turn is half lock"
+	)
+
+
+func test_cab_wheel_matches_the_on_screen_wheel() -> void:
+	assert_almost_eq(BusBody.WHEEL_LOCK_TURNS * TAU, SteeringWheelMath.DEFAULT_MAX_ANGLE, 0.0001)

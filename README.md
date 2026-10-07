@@ -20,7 +20,7 @@ The full design lives in [docs/game-design.md](docs/game-design.md).
    **More details → Install anyway**).
 4. Open **Bus Simulator** and rotate the phone to landscape.
 
-Requires Android 7.0+ on a 64-bit phone; no internet needed to play. Full guide
+Requires Android 7.0+ (32- or 64-bit ARM phones); no internet needed to play. Full guide
 with USB/ADB install, updating and troubleshooting:
 **[docs/install-android.md](docs/install-android.md)**.
 
@@ -45,6 +45,9 @@ with USB/ADB install, updating and troubleshooting:
 * **Economy** — 5 buses in 4 body styles (minibus, city, double decker,
   coach), 4 upgrade lines × 5 levels, paint, stripes, rims, window tint and
   roof colours, optional repairs. Balance is checked by tests.
+* **Photo textures** — real CC0 asphalt, paving, brick, concrete, grass, dirt
+  and rock from [ambientCG](https://ambientcg.com), shipped in 480 / 720 /
+  1080 px and picked by the graphics setting (Low / Medium / High+).
 * **Traffic** — lane-locked AI cars using the Intelligent Driver Model; they
   queue behind the bus and **give way when you signal** a lane change.
 * **Damage** — hittable parts (front/rear/left/right panels, left/right
@@ -61,7 +64,7 @@ with USB/ADB install, updating and troubleshooting:
 
 | Action | Touch | Keyboard |
 |---|---|---|
-| Steer | drag the wheel | A / D or ← / → |
+| Steer (two full turns each way) | drag the wheel round | A / D or ← / → |
 | Accelerate / brake | GAS / BRAKE pedals | W / S or ↑ / ↓ |
 | Indicators | arrow buttons | Q / E |
 | Gear (Drive / Reverse, when stopped) | D/R gate | R |
@@ -110,13 +113,15 @@ tools/lint.sh
   Each stage uploads its JUnit report and writes a summary to the job page.
 * **CD** (`cd.yml`) runs on every push to `main` and on `v*` tags: the full CI
   pipeline, then a headless Android export (`tools/export_android.sh`). The APK
-  is verified (signed, arm64, correct package/version, and **no INTERNET
+  is verified (v2-signed with the project key, arm64 + armv7, correct package/version, and **no INTERNET
   permission** since the game is fully offline) and uploaded as an artifact.
   Tags also publish a GitHub Release with the APK attached.
 
 ### Release signing
 
-Without secrets, CD produces a debug-signed APK. To ship release-signed builds,
+Without secrets, CD signs the APK with the committed debug key
+(`tools/android/debug.keystore`), so every release installs over the previous
+one as an update. To ship release-signed builds (e.g. for the Play Store),
 add these repository secrets:
 
 | Secret | Value |

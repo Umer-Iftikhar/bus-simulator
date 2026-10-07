@@ -54,6 +54,9 @@ static func create(map_def: MapDef, bus_spec: BusSpec, session_options := {}) ->
 
 
 func _ready() -> void:
+	# Photo texture resolution follows the graphics preset (default: medium).
+	var preset: String = options.get("graphics", GraphicsSettings.DEFAULT)
+	WorldLook.texture_size = GraphicsSettings.profile(preset)["texture_size"]
 	world = GameWorld.create(map)
 	add_child(world)
 

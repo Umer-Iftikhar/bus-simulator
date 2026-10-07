@@ -2,8 +2,9 @@ class_name SteeringWheelMath
 extends RefCounted
 ## Geometry for the on-screen steering wheel.
 
-## Rotation of the wheel (radians) that maps to full steering lock.
-const DEFAULT_MAX_ANGLE := PI * 0.75
+## Rotation of the wheel (radians) that maps to full steering lock: two full
+## turns each way, like a real bus wheel.
+const DEFAULT_MAX_ANGLE := TAU * 2.0
 
 
 ## Angle of [param point] around [param center], measured clockwise from "up".

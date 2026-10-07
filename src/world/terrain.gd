@@ -190,13 +190,20 @@ func _color_for(h: float, slope: float) -> Color:
 	var base := map.ground_color
 	if h < map.water_level + 1.5:
 		base = base.lerp(Color(0.55, 0.5, 0.38), 0.6)  # muddy banks
+	var color := base.lerp(ROCK_COLOR, _rockiness(h, slope))
+	return color.lerp(SNOW_COLOR, _snow(h))
+
+
+## 0..1: how much bare rock shows (steep slopes, high mountain tops).
+func _rockiness(h: float, slope: float) -> float:
 	var rockiness := clampf((slope - 0.45) * 2.0, 0.0, 1.0)
 	if map.terrain_amplitude > 60.0:
 		rockiness = maxf(rockiness, clampf((h - 110.0) / 60.0, 0.0, 1.0) * 0.7)
-	var color := base.lerp(ROCK_COLOR, rockiness)
-	if h > 170.0:
-		color = color.lerp(SNOW_COLOR, clampf((h - 170.0) / 40.0, 0.0, 1.0))
-	return color
+	return rockiness
+
+
+func _snow(h: float) -> float:
+	return clampf((h - 170.0) / 40.0, 0.0, 1.0)
 
 
 ## Builds the visible mesh and its collision as one StaticBody named "Ground".
@@ -212,8 +219,13 @@ func build() -> StaticBody3D:
 			var hx := heights[r * columns + mini(c + 1, columns - 1)]
 			var hz := heights[mini(r + 1, rows - 1) * columns + c]
 			var slope := Vector2(hx - h, hz - h).length() / CELL
+			var x := bounds.position.x + c * CELL
+			var z := bounds.position.y + r * CELL
 			st.set_color(_color_for(h, slope))
-			st.add_vertex(Vector3(bounds.position.x + c * CELL, h, bounds.position.y + r * CELL))
+			# UV: world XZ (for tangents); UV2: rock and snow cover for the shader.
+			st.set_uv(Vector2(x, z))
+			st.set_uv2(Vector2(_rockiness(h, slope), _snow(h)))
+			st.add_vertex(Vector3(x, h, z))
 	for r in rows - 1:
 		for c in columns - 1:
 			var i := r * columns + c
@@ -224,12 +236,8 @@ func build() -> StaticBody3D:
 			st.add_index(i + columns + 1)
 			st.add_index(i + columns)
 	st.generate_normals()
-	# Fine-grained texture: paving in the big cities, grass and earth elsewhere.
-	var urban := map.style in ["nyc", "tokyo"]
-	var scale := 0.35 if urban else 0.12
-	var material := WorldLook.textured(Color.WHITE, 1.0, 0.1, scale, map.scenery_seed, 0.18)
-	material.vertex_color_use_as_albedo = true
-	st.set_material(material)
+	st.generate_tangents()
+	st.set_material(WorldLook.terrain(map))
 	var mesh := st.commit()
 	var body := StaticBody3D.new()
 	body.name = "Ground"
