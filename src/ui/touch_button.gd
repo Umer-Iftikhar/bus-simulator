@@ -11,6 +11,11 @@ var held := false
 var lit := false
 var base_color := Color(0.1, 0.12, 0.15, 0.55)
 var lit_color := Color(1.0, 0.75, 0.15, 0.85)
+## Shape: "box", "round" (bezel + [member icon]), "arrow_left", "arrow_right" or "gear".
+var style := "box"
+var icon := ""
+## Icon tint for round buttons; transparent means the default white.
+var glow := Color(0, 0, 0, 0)
 var _touch_index := -1
 
 
@@ -54,6 +59,16 @@ func _notification(what: int) -> void:
 
 
 func _draw() -> void:
+	match style:
+		"round":
+			ControlArt.round_button(self, size, held, glow, icon)
+			return
+		"arrow_left", "arrow_right":
+			ControlArt.arrow_button(self, size, held, lit, style == "arrow_left")
+			return
+		"gear":
+			ControlArt.gear_gate(self, size, lit)
+			return
 	var color := lit_color if lit else base_color
 	if held:
 		color = color.lightened(0.25)

@@ -42,6 +42,10 @@ var gauge_glow := _emissive(Color(0.08, 0.09, 0.1), 0.2)
 var gauge_ring := _emissive(Color(0.9, 0.9, 0.85), 0.8)
 var arrow_off := _emissive(Color(0.05, 0.25, 0.05), 0.0)
 var arrow_on := _emissive(Color(0.2, 1.0, 0.2), 3.0)
+var high_beam_off := _emissive(Color(0.04, 0.06, 0.2), 0.0)
+var high_beam_on := _emissive(Color(0.2, 0.45, 1.0), 3.0)
+## Blue "main beam" tell-tale on the instrument cluster.
+var high_beam_lamp: MeshInstance3D
 ## Rotates with the steering input (spins around its local Z axis).
 var steering_wheel: Node3D
 var speed_needle: Node3D
@@ -370,6 +374,9 @@ func _build_cockpit(eye: Vector3, yb: float) -> void:
 			arrow_off
 		)
 		dash_arrows[side] = arrow
+	high_beam_lamp = _child_box(
+		cluster, "HighBeamLamp", Vector3(0.03, 0.016, 0.01), Vector3(0, 0.06, -0.01), high_beam_off
+	)
 	gear_label = Label3D.new()
 	gear_label.name = "GearDisplay"
 	gear_label.text = "D"
@@ -405,8 +412,17 @@ func _build_cockpit(eye: Vector3, yb: float) -> void:
 		)
 		spoke.rotation = Vector3(0, 0, angle)
 		spoke.position = Vector3(cos(angle), sin(angle), 0) * -0.095
-	var hub := _child_box(steering_wheel, "Hub", Vector3(0.09, 0.09, 0.05), Vector3.ZERO, dash)
+	var hub := MeshInstance3D.new()
+	hub.name = "Hub"
+	var pad := CylinderMesh.new()
+	pad.top_radius = 0.07
+	pad.bottom_radius = 0.075
+	pad.height = 0.05
+	pad.material = dash
+	hub.mesh = pad
+	hub.rotation = Vector3(PI / 2.0, 0, 0)
 	hub.position.z = 0.01
+	steering_wheel.add_child(hub)
 	_child_box(column, "Column", Vector3(0.06, 0.06, 0.35), Vector3(0, 0, 0.2), trim_material)
 	cabin_light = OmniLight3D.new()
 	cabin_light.name = "CabinLight"
@@ -488,8 +504,11 @@ static func needle_angle(fraction: float) -> float:
 
 
 ## Exterior and cabin lights. [param braking]/[param reverse] drive the rear lamps.
-func set_lights(headlights_on: bool, braking: bool, reverse: bool) -> void:
+func set_lights(headlights_on: bool, braking: bool, reverse: bool, high_beam := false) -> void:
 	head_material.emission_energy_multiplier = 4.0 if headlights_on else 0.6
+	if high_beam:
+		head_material.emission_energy_multiplier = 7.0
+	high_beam_lamp.material_override = high_beam_on if high_beam else high_beam_off
 	var tail_energy := 0.4
 	if headlights_on:
 		tail_energy = 1.5

@@ -7,6 +7,7 @@ extends RefCounted
 ## partially-corrupt save can never break the game.
 
 const VERSION := 1
+const INDICATOR_MODES := ["manual", "auto"]
 
 var wallet := Wallet.new()
 ## bus_id -> {"upgrades": {key: level}, "cosmetics": {category: id},
@@ -15,7 +16,7 @@ var owned := {}
 var selected_bus := Catalog.STARTER_BUS
 var selected_map := "islamabad"
 var stats := {"runs": 0, "delivered": 0, "earned": 0}
-var settings := {"graphics": GraphicsSettings.DEFAULT}
+var settings := {"graphics": GraphicsSettings.DEFAULT, "indicators": "manual"}
 var money: int:
 	get:
 		return wallet.balance
@@ -41,6 +42,11 @@ static func default_owned_bus() -> Dictionary:
 
 func graphics() -> String:
 	return settings["graphics"]
+
+
+## True when turn signals are set to Automatic.
+func auto_indicators() -> bool:
+	return settings["indicators"] == "auto"
 
 
 func owns(bus_id: String) -> bool:
@@ -123,6 +129,8 @@ static func from_dict(data: Dictionary) -> SaveData:
 		save.settings["graphics"] = (
 			preset if GraphicsSettings.is_valid(preset) else GraphicsSettings.DEFAULT
 		)
+		var mode := str(raw_settings.get("indicators", "manual"))
+		save.settings["indicators"] = mode if INDICATOR_MODES.has(mode) else "manual"
 	var raw_stats = data.get("stats", {})
 	if raw_stats is Dictionary:
 		for key in save.stats:

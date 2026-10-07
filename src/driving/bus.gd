@@ -25,6 +25,10 @@ const MIRROR_HEAD := Vector3(0.12, 0.42, 0.26)
 const DOOR_WIDTH := 1.1
 const DOOR_TRAVEL := 1.05
 const DOOR_TIME := 0.4
+## Light switch positions, cycled by L / the LIGHT button.
+const LIGHTS_OFF := 0
+const LOW_BEAM := 1
+const HIGH_BEAM := 2
 
 var spec: BusSpec
 var input := DriveInput.new()
@@ -46,7 +50,11 @@ var body: BusBody
 var rim_material := StandardMaterial3D.new()
 ## Gearbox: false = Drive, true = Reverse.
 var reverse_gear := false
-var headlights_on := false
+## Headlamp setting: [constant LIGHTS_OFF], [constant LOW_BEAM] or [constant HIGH_BEAM].
+var light_mode := LIGHTS_OFF
+var headlights_on: bool:
+	get:
+		return light_mode != LIGHTS_OFF
 ## Indicator lamp state mirrored on the dashboard (set by the session).
 var dash_left := false
 var dash_right := false
@@ -169,26 +177,46 @@ func _build_headlights() -> void:
 		lamp.name = "Headlight%s" % ("L" if side > 0.0 else "R")
 		lamp.position = Vector3(side * (spec.width / 2.0 - 0.35), 0.95, spec.length / 2.0 + 0.05)
 		# SpotLight3D shines down its -Z; turn it to face the bus's +Z.
-		lamp.rotation = Vector3(-0.08, PI, 0.0)
-		lamp.spot_range = 70.0
-		lamp.spot_angle = 36.0
-		lamp.spot_attenuation = 0.8
-		lamp.light_energy = 14.0
+		lamp.rotation = Vector3(beam(LOW_BEAM)["pitch"], PI, 0.0)
 		lamp.light_color = Color(1.0, 0.95, 0.85)
 		lamp.visible = false
 		add_child(lamp)
 		headlights.append(lamp)
+	set_light_mode(light_mode)
 
 
-func set_headlights(on: bool) -> void:
-	headlights_on = on
+## Spot-lamp settings for a beam: low beam dips toward the road ahead,
+## high beam throws a narrower, brighter cone much further.
+static func beam(mode: int) -> Dictionary:
+	if mode == HIGH_BEAM:
+		return {"range": 120.0, "angle": 24.0, "energy": 24.0, "pitch": -0.02}
+	return {"range": 65.0, "angle": 38.0, "energy": 12.0, "pitch": -0.12}
+
+
+func set_light_mode(mode: int) -> void:
+	light_mode = clampi(mode, LIGHTS_OFF, HIGH_BEAM)
+	var settings := beam(light_mode)
 	for lamp in headlights:
-		lamp.visible = on
+		lamp.visible = light_mode != LIGHTS_OFF
+		lamp.spot_range = settings["range"]
+		lamp.spot_angle = settings["angle"]
+		lamp.light_energy = settings["energy"]
+		lamp.rotation.x = settings["pitch"]
 	_update_lights()
 
 
+## Off -> low beam -> high beam -> off.
+func cycle_lights() -> void:
+	set_light_mode((light_mode + 1) % 3)
+
+
+## Switches to low beam (on) or off.
+func set_headlights(on: bool) -> void:
+	set_light_mode(LOW_BEAM if on else LIGHTS_OFF)
+
+
 func toggle_headlights() -> void:
-	set_headlights(not headlights_on)
+	cycle_lights()
 
 
 ## Shifts between Drive and Reverse. Only allowed when (nearly) stopped;
@@ -213,7 +241,7 @@ func is_braking() -> bool:
 
 
 func _update_lights() -> void:
-	body.set_lights(headlights_on, is_braking(), reverse_gear)
+	body.set_lights(headlights_on, is_braking(), reverse_gear, light_mode == HIGH_BEAM)
 
 
 ## Bus-local centre of a side mirror head ([constant DamageModel.MIRROR_LEFT] or RIGHT).

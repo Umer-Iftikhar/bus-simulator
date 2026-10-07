@@ -27,14 +27,24 @@ with USB/ADB install, updating and troubleshooting:
 ## Features
 
 * **Driving** — procedural `VehicleBody3D` buses with a realistic drivetrain
-  (top-speed fade, brake-to-reverse, speed-sensitive steering), touch steering
-  wheel + pedals, keyboard support, horn, chase / driver / top-down cameras.
-* **Routes** — 4 hand-tuned maps (Harbor Loop, Desert Highway, Downtown,
-  Pine Hills by Night), stops as `Area3D` triggers, metro-style passengers with
-  fixed boarding and destination stops, fare paid at the end terminal.
-* **Economy** — 5-bus ladder (capacity only comes from buying bigger buses),
-  4 upgrade lines × 5 levels, paint jobs, optional repairs. Balance is checked
-  by tests so there is always a next goal.
+  (D/R gearbox, top-speed fade, smooth speed-sensitive steering), keyboard
+  support, horn, chase / driver (with a working dashboard) / top-down cameras.
+* **Realistic touch controls** — a leather steering wheel with spokes and an
+  airbag hub, a tall accelerator and wide ribbed brake pedal that sink when
+  pressed, arrow-shaped indicator stalks, a D/R gear gate and chrome round
+  buttons for horn, camera, lights and pause.
+* **Lights** — off / low beam / high beam, with a blue main-beam tell-tale on
+  the dash; brake, reverse and cabin lights.
+* **Indicators** — *Manual* (you signal) or *Automatic* (signals into stops,
+  when pulling out and when changing lanes), chosen in the main menu.
+* **Maps** — five real cities, 2.8–3.8 km loops: Islamabad, Washington D.C.,
+  Rawalakot (mountains), Tokyo by night and New York City, with terrain,
+  rivers and bridges, landmarks, pedestrians and parked cars. Stops are
+  450–850 m apart, with a "Bus stop ahead" banner counting down the distance.
+  Passengers board at one stop and ride to another; fares are paid at the end.
+* **Economy** — 5 buses in 4 body styles (minibus, city, double decker,
+  coach), 4 upgrade lines × 5 levels, paint, stripes, rims, window tint and
+  roof colours, optional repairs. Balance is checked by tests.
 * **Traffic** — lane-locked AI cars using the Intelligent Driver Model; they
   queue behind the bus and **give way when you signal** a lane change.
 * **Damage** — hittable parts (front/rear/left/right panels, left/right
@@ -52,11 +62,13 @@ with USB/ADB install, updating and troubleshooting:
 | Action | Touch | Keyboard |
 |---|---|---|
 | Steer | drag the wheel | A / D or ← / → |
-| Accelerate / brake (hold brake to reverse) | GAS / BRAKE | W / S or ↑ / ↓ |
-| Indicators | `<` / `>` | Q / E |
-| Camera | CAM | C |
-| Horn | HORN | H |
-| Menu | MENU | Esc |
+| Accelerate / brake | GAS / BRAKE pedals | W / S or ↑ / ↓ |
+| Indicators | arrow buttons | Q / E |
+| Gear (Drive / Reverse, when stopped) | D/R gate | R |
+| Lights (off → low → high beam) | headlamp button | L |
+| Camera | camera button | C |
+| Horn | horn button | H |
+| Menu | pause button | Esc |
 
 ## Project layout
 

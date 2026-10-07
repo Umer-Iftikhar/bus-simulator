@@ -58,10 +58,19 @@ func test_touch_gear_and_light_buttons() -> void:
 	driver.touch(controls.lights_button, true, 1)
 	await wait_process_frames(1)
 	driver.touch(controls.lights_button, false, 1)
-	assert_true(session.bus.headlights_on)
+	assert_eq(session.bus.light_mode, Bus.LOW_BEAM)
+	await wait_physics_frames(2)
 	assert_true(controls.lights_button.lit)
+	assert_eq(controls.lights_button.glow, ControlArt.LOW_BEAM, "green low-beam icon")
 	await driver.tap_key(KEY_L)
-	assert_false(session.bus.headlights_on, "L toggles them off again")
+	assert_eq(session.bus.light_mode, Bus.HIGH_BEAM, "L switches to high beam")
+	await wait_physics_frames(2)
+	assert_eq(controls.lights_button.icon, "light_high")
+	assert_eq(controls.lights_button.glow, ControlArt.HIGH_BEAM, "blue high-beam icon")
+	await driver.tap_key(KEY_L)
+	assert_false(session.bus.headlights_on, "and off again")
+	await wait_physics_frames(2)
+	assert_false(controls.lights_button.lit)
 
 
 func test_night_map_starts_with_lights_on() -> void:

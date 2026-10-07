@@ -14,6 +14,7 @@ var bus_picker := OptionButton.new()
 var map_info := Label.new()
 var condition_label := Label.new()
 var graphics_picker := OptionButton.new()
+var indicator_picker := OptionButton.new()
 var studio_label := Label.new()
 var drive_button := Button.new()
 var garage_button := Button.new()
@@ -95,9 +96,22 @@ func _build() -> void:
 		graphics_picker.add_item("Graphics: %s" % GraphicsSettings.display_name(preset))
 		graphics_picker.set_item_metadata(graphics_picker.item_count - 1, preset)
 	graphics_picker.item_selected.connect(_on_graphics_selected)
-	graphics_picker.custom_minimum_size = Vector2(0, 52)
-	graphics_picker.add_theme_font_size_override("font_size", 22)
-	column.add_child(graphics_picker)
+	indicator_picker.name = "Indicators"
+	indicator_picker.add_item("Indicators: Manual")
+	indicator_picker.set_item_metadata(0, "manual")
+	indicator_picker.add_item("Indicators: Auto")
+	indicator_picker.set_item_metadata(1, "auto")
+	indicator_picker.item_selected.connect(_on_indicators_selected)
+	# Settings side by side so the menu still fits a phone screen.
+	var settings_row := HBoxContainer.new()
+	settings_row.name = "Settings"
+	settings_row.add_theme_constant_override("separation", 12)
+	for picker in [graphics_picker, indicator_picker]:
+		picker.custom_minimum_size = Vector2(0, 52)
+		picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		picker.add_theme_font_size_override("font_size", 20)
+		settings_row.add_child(picker)
+	column.add_child(settings_row)
 	refresh()
 
 
@@ -123,6 +137,7 @@ func refresh() -> void:
 	for i in graphics_picker.item_count:
 		if graphics_picker.get_item_metadata(i) == save.graphics():
 			graphics_picker.select(i)
+	indicator_picker.select(1 if save.auto_indicators() else 0)
 	var damage := garage.damage_of(save.selected_bus)
 	if damage.is_wrecked():
 		condition_label.text = "This bus is wrecked — repair it in the Garage"
@@ -140,6 +155,11 @@ func _on_map_selected(index: int) -> void:
 
 func _on_graphics_selected(index: int) -> void:
 	save.settings["graphics"] = graphics_picker.get_item_metadata(index)
+	selection_changed.emit()
+
+
+func _on_indicators_selected(index: int) -> void:
+	save.settings["indicators"] = indicator_picker.get_item_metadata(index)
 	selection_changed.emit()
 
 

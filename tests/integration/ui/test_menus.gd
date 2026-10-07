@@ -125,6 +125,7 @@ func test_every_main_menu_control_is_on_screen() -> void:
 		menu.drive_button,
 		menu.garage_button,
 		menu.graphics_picker,
+		menu.indicator_picker,
 	]
 	for control in controls:
 		assert_true(screen.encloses(control.get_global_rect()), "%s on screen" % control.name)
@@ -156,3 +157,25 @@ func test_main_menu_shows_marrij_g() -> void:
 	var screen := Rect2(Vector2.ZERO, menu.size)
 	assert_true(screen.encloses(label.get_global_rect()), "fully on screen")
 	assert_ge(label.get_theme_font_size("font_size"), 28, "big enough to read")
+
+
+func test_indicator_picker_switches_between_manual_and_auto() -> void:
+	var menu := add_child_autofree(MainMenu.create(save, garage)) as MainMenu
+	watch_signals(menu)
+	assert_eq(menu.indicator_picker.item_count, 2)
+	assert_eq(menu.indicator_picker.get_item_metadata(menu.indicator_picker.selected), "manual")
+	menu.indicator_picker.select(1)
+	menu.indicator_picker.item_selected.emit(1)
+	assert_true(save.auto_indicators())
+	assert_signal_emitted(menu, "selection_changed")
+	menu.refresh()
+	assert_eq(menu.indicator_picker.selected, 1, "shows the saved choice")
+
+
+func test_settings_sit_side_by_side() -> void:
+	var menu := add_child_autofree(MainMenu.create(save, garage)) as MainMenu
+	await wait_process_frames(2)
+	var graphics := menu.graphics_picker.get_global_rect()
+	var indicators := menu.indicator_picker.get_global_rect()
+	assert_almost_eq(graphics.position.y, indicators.position.y, 1.0, "same row")
+	assert_false(graphics.intersects(indicators))
