@@ -71,7 +71,7 @@ func test_wheel_drag_clockwise_steers_right_and_springs_back() -> void:
 	_touch(wheel, c + Vector2(0, -80), true)
 	_drag(wheel, c + Vector2(80, 0))
 	assert_almost_eq(wheel.wheel_angle, PI / 2.0, 0.01)
-	assert_gt(controls.steer(), 0.5)
+	assert_almost_eq(controls.steer(), 0.125, 0.01, "a quarter turn of a two-turn wheel")
 	_touch(wheel, c + Vector2(80, 0), false)
 	assert_false(wheel.is_held())
 	await wait_seconds(1.0)
@@ -82,9 +82,15 @@ func test_wheel_drag_anticlockwise_past_limit_clamps_to_full_left() -> void:
 	var wheel := controls.wheel
 	var c := wheel.size / 2.0
 	_touch(wheel, c + Vector2(0, -80), true)
-	for point in [Vector2(-80, 0), Vector2(0, 80), Vector2(80, 0), Vector2(0, -80)]:
+	var circle := [Vector2(-80, 0), Vector2(0, 80), Vector2(80, 0), Vector2(0, -80)]
+	for point in circle:
 		_drag(wheel, c + point)
-	assert_eq(controls.steer(), -1.0)
+	assert_almost_eq(controls.steer(), -0.5, 0.01, "one full turn is half lock")
+	for lap in 2:
+		for point in circle:
+			_drag(wheel, c + point)
+	assert_eq(controls.steer(), -1.0, "locks after two full turns")
+	assert_almost_eq(wheel.wheel_angle, -TAU * 2.0, 0.001)
 
 
 func test_wheel_ignores_drags_from_other_fingers() -> void:
@@ -101,7 +107,7 @@ func test_wheel_and_pedal_work_simultaneously() -> void:
 	_touch(controls.gas, Vector2(5, 5), true, 1)
 	_drag(controls.wheel, c + Vector2(-80, 0), 0)
 	assert_eq(controls.throttle(), 1.0)
-	assert_lt(controls.steer(), -0.5)
+	assert_almost_eq(controls.steer(), -0.125, 0.01)
 
 
 func test_buttons_emit_their_signals() -> void:

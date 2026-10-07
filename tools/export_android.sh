@@ -27,16 +27,12 @@ if [[ "$MODE" == "release" ]]; then
   export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="${RELEASE_KEYSTORE_PASSWORD:?}"
 fi
 
+# Debug builds are signed with the committed debug key, so every release has
+# the same signature and installs over the previous one as an update.
 if [[ "$MODE" == "debug" && -z "${GODOT_ANDROID_KEYSTORE_DEBUG_PATH:-}" ]]; then
-  export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$OUT_DIR/debug.keystore"
+  export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$ROOT/tools/android/debug.keystore"
   export GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey"
   export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android"
-  if [[ ! -f "$GODOT_ANDROID_KEYSTORE_DEBUG_PATH" ]]; then
-    keytool -genkeypair -v -keystore "$GODOT_ANDROID_KEYSTORE_DEBUG_PATH" \
-      -storepass android -alias androiddebugkey -keypass android \
-      -keyalg RSA -keysize 2048 -validity 10000 \
-      -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1
-  fi
 fi
 
 # Point the editor at the SDK and JDK (Godot reads these from editor settings).
@@ -69,12 +65,22 @@ echo "APK: $APK ($((size / 1024 / 1024)) MiB)"
 (( size > 5 * 1024 * 1024 )) || { echo "::error::APK suspiciously small"; exit 1; }
 
 listing=$(unzip -l "$APK")
-for entry in classes.dex AndroidManifest.xml lib/arm64-v8a/ assets/; do
+# arm64 for modern phones, armeabi-v7a for phones running 32-bit Android
+# (common on budget devices; without it they report "package appears to be invalid").
+for entry in classes.dex AndroidManifest.xml lib/arm64-v8a/ lib/armeabi-v7a/ assets/; do
   grep -q "$entry" <<<"$listing" || { echo "::error::APK is missing $entry"; exit 1; }
 done
 
 BUILD_TOOLS=$(ls -d "${ANDROID_SDK_ROOT:-$ANDROID_HOME}"/build-tools/* | sort -V | tail -1)
-"$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | head -3
+signing=$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK")
+head -8 <<<"$signing"
+# A v2 signature is what Android 7+ checks; without it installs fail as "invalid".
+for scheme in v2; do
+  grep -q "Verified using $scheme scheme (.*): true" <<<"$signing"     || { echo "::error::APK is not signed with the $scheme scheme"; exit 1; }
+done
+if [[ "$MODE" == "debug" && "$GODOT_ANDROID_KEYSTORE_DEBUG_PATH" == "$ROOT/tools/android/debug.keystore" ]]; then
+  grep -qi "8e7be1242bd8660fea115635d97b57567b6696f40b07f43e5cbe8ccf81af5ef8" <<<"$signing"     || { echo "::error::APK not signed with the project debug key"; exit 1; }
+fi
 badging=$("$BUILD_TOOLS/aapt2" dump badging "$APK")
 grep -q "package: name='com.umeriftikhar.bussimulator'" <<<"$badging" \
   || { echo "::error::unexpected package name"; exit 1; }
@@ -85,5 +91,5 @@ if grep -qE "uses-permission: name='android.permission.INTERNET'" <<<"$badging";
   echo "::error::APK requests INTERNET permission but the game must be offline"
   exit 1
 fi
-echo "APK verified: signed, arm64, offline (no INTERNET permission)."
+echo "APK verified: signed (v2, stable key), arm64 + armv7, offline (no INTERNET permission)."
 echo "apk=$APK" >>"${GITHUB_OUTPUT:-/dev/null}"

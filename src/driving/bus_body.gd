@@ -19,7 +19,7 @@ const WHEEL_BELOW_EYE := 0.5
 const WHEEL_AHEAD_OF_EYE := 0.5
 const SPEEDO_MAX_KMH := 120.0
 ## Steering wheel turns per side at full lock.
-const WHEEL_LOCK_TURNS := 0.4
+const WHEEL_LOCK_TURNS := 2.0
 
 var spec: BusSpec
 var clearance := 0.55

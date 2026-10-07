@@ -6,10 +6,11 @@
    (if Google Play Protect warns, choose **More details → Install anyway**).
 4. Open **Bus Simulator** and rotate the phone to landscape.
 
-Requires Android 7.0+ on a 64-bit phone. No internet needed to play.
+Requires Android 7.0+ on an ARM phone (32- or 64-bit). No internet needed to play.
 Full guide (USB/ADB install, updating, troubleshooting): [docs/install-android.md](https://github.com/Umer-Iftikhar/bus-simulator/blob/main/docs/install-android.md)
 
-> If installing over an older version fails with "App not installed", uninstall the old version first
-> (debug builds are signed with a different key each time; this resets saved progress).
+> Coming from v0.3.0 or older? Uninstall the old version once first (those builds used a throwaway
+> signing key, so Android reports the new APK as "invalid" or "not installed"). From v0.4.0 on,
+> updates install straight over the previous version and keep your progress.
 
 ---
