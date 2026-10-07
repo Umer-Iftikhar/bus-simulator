@@ -5,7 +5,7 @@ var session: DriveSession
 
 
 func before_each() -> void:
-	session = DriveSession.create(Maps.harbor(), BusSpec.new(), {"seed": 2, "traffic": false})
+	session = DriveSession.create(Maps.islamabad(), BusSpec.new(), {"seed": 2, "traffic": false})
 	add_child_autofree(session)
 	await wait_physics_frames(3)
 
@@ -64,7 +64,7 @@ func test_signal_cancels_itself_after_changing_lane() -> void:
 	var track := session.world.track
 	var offset := track.closest_offset(session.bus.global_position)
 	var xform := track.vehicle_transform(1, offset)
-	xform.origin.y = 0.3
+	xform.origin.y += 0.3
 	session.bus.global_transform = xform
 	await wait_seconds(Indicators.SETTLE_TIME + 0.5)
 	assert_false(session.indicators.is_active())

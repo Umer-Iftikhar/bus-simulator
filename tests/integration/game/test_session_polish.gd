@@ -13,7 +13,7 @@ func _start(map: MapDef, options := {}) -> void:
 
 
 func test_night_map_turns_headlights_on_and_dims_the_sun() -> void:
-	await _start(Maps.pines())
+	await _start(Maps.tokyo())
 	for lamp in session.bus.headlights:
 		assert_true(lamp.visible)
 	var sun := session.world.get_node("Sun") as DirectionalLight3D
@@ -21,15 +21,15 @@ func test_night_map_turns_headlights_on_and_dims_the_sun() -> void:
 
 
 func test_day_map_keeps_headlights_off() -> void:
-	await _start(Maps.harbor())
+	await _start(Maps.islamabad())
 	for lamp in session.bus.headlights:
 		assert_false(lamp.visible)
 
 
 func test_doors_open_when_a_stop_is_served_then_close() -> void:
-	await _start(Maps.harbor())
+	await _start(Maps.islamabad())
 	var xform := session.world.track.vehicle_transform(0, session.map.stop_offset(0))
-	xform.origin.y = 0.3
+	xform.origin.y += 0.3
 	session.bus.global_transform = xform
 	var opened := await wait_until(func() -> bool: return session.bus.doors_open, 3.0)
 	assert_true(opened, "doors open at the stop")
@@ -62,7 +62,7 @@ func test_main_menu_graphics_picker_updates_settings() -> void:
 
 func test_graphics_preset_is_applied_to_the_session() -> void:
 	for preset in ["low", "ultra"]:
-		await _start(Maps.harbor(), {"graphics": preset})
+		await _start(Maps.islamabad(), {"graphics": preset})
 		var p := GraphicsSettings.profile(preset)
 		var viewport := session.get_viewport()
 		assert_eq(viewport.msaa_3d, p["msaa"], preset)

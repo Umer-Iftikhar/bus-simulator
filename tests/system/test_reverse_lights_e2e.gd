@@ -67,7 +67,7 @@ func test_touch_gear_and_light_buttons() -> void:
 func test_night_map_starts_with_lights_on() -> void:
 	await driver.tap_key(KEY_ESCAPE)
 	await wait_process_frames(2)
-	await driver.select_option(driver.main.menu.map_picker, "pines")
+	await driver.select_option(driver.main.menu.map_picker, "tokyo")
 	await driver.click(driver.main.menu.drive_button)
 	await wait_seconds(1.0)
 	var bus: Bus = driver.main.session.bus

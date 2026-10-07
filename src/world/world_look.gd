@@ -5,18 +5,35 @@ extends RefCounted
 ## image assets ship with the game.
 
 const BUILDING_SHADER := preload("res://src/world/shaders/building.gdshader")
+const SKY_SHADER := preload("res://src/world/shaders/sky.gdshader")
+const BACKDROPS := {"none": 0, "mountains": 1, "hills_north": 2, "fuji": 3, "skyline": 4}
+## Horizon backdrops are drawn as if this far away (m) to turn heights into angles.
+const BACKDROP_DISTANCE := 4000.0
+
+
+## The sky: gradient, sun/moon, clouds, stars and the map's painted horizon.
+static func sky_material(map: MapDef) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = SKY_SHADER
+	material.set_shader_parameter("top_color", map.sky_top)
+	material.set_shader_parameter("horizon_color", map.sky_horizon)
+	material.set_shader_parameter("ground_color", map.ground_color.darkened(0.5))
+	material.set_shader_parameter("cloud_cover", map.cloud_cover)
+	material.set_shader_parameter("night", 1.0 if map.night else 0.0)
+	material.set_shader_parameter("backdrop", BACKDROPS.get(map.backdrop, 0))
+	material.set_shader_parameter("backdrop_angle", atan(map.backdrop_height / BACKDROP_DISTANCE))
+	var far := Color(0.3, 0.36, 0.44) if map.backdrop != "skyline" else Color(0.42, 0.45, 0.52)
+	if map.night:
+		far = far.darkened(0.6)
+	material.set_shader_parameter("backdrop_color", far)
+	material.set_shader_parameter("seed", float(map.scenery_seed % 97) * 0.13)
+	return material
 
 
 static func environment(map: MapDef) -> Environment:
-	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = map.sky_top
-	sky_material.sky_horizon_color = map.sky_horizon
-	sky_material.ground_horizon_color = map.sky_horizon
-	sky_material.ground_bottom_color = map.ground_color.darkened(0.5)
-	sky_material.sun_angle_max = 25.0
-	sky_material.sky_energy_multiplier = 0.6 if map.night else 1.0
 	var sky := Sky.new()
-	sky.sky_material = sky_material
+	sky.sky_material = sky_material(map)
+	sky.radiance_size = Sky.RADIANCE_SIZE_64
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky

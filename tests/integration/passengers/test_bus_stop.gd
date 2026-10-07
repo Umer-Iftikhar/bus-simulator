@@ -19,7 +19,7 @@ func _bus_at(lane: int, offset: float) -> Bus:
 	var bus := Bus.create(BusSpec.new())
 	world.add_child(bus)
 	var xform := track.vehicle_transform(lane, offset)
-	xform.origin.y = 0.3
+	xform.origin.y += 0.3
 	bus.global_transform = xform
 	await wait_physics_frames(6)
 	return bus
@@ -44,7 +44,7 @@ func test_ignores_bus_in_the_other_lane_or_far_away() -> void:
 func test_detects_bus_leaving() -> void:
 	var bus := await _bus_at(0, 200.0)
 	var xform := track.vehicle_transform(0, 300.0)
-	xform.origin.y = 0.3
+	xform.origin.y += 0.3
 	bus.global_transform = xform
 	await wait_physics_frames(6)
 	assert_false(stop.bus_inside())

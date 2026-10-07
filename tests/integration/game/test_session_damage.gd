@@ -7,7 +7,7 @@ var session: DriveSession
 func _start(options := {}) -> void:
 	options["seed"] = 3
 	options["traffic"] = options.get("traffic", false)
-	session = DriveSession.create(Maps.harbor(), BusSpec.new(), options)
+	session = DriveSession.create(Maps.islamabad(), BusSpec.new(), options)
 	add_child_autofree(session)
 	await wait_physics_frames(3)
 
@@ -62,7 +62,7 @@ func test_wrecking_the_bus_fails_the_run() -> void:
 
 func test_traffic_option_controls_spawning() -> void:
 	await _start({"traffic": true})
-	assert_eq(session.traffic.cars.size(), Maps.harbor().traffic_cars)
+	assert_eq(session.traffic.cars.size(), Maps.islamabad().traffic_cars)
 	session.free()
 	await _start({"traffic": false})
 	assert_eq(session.traffic.cars.size(), 0)

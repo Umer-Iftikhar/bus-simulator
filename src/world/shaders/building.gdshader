@@ -47,8 +47,10 @@ void fragment() {
 			albedo = glass_color.rgb * (0.85 + 0.3 * hash(vec2(floor(u / window_spacing), level + building_seed)));
 			roughness = 0.08;
 			metallic = 0.5;
-			float lit = step(0.55, hash(vec2(floor(u / window_spacing) + building_seed, level)));
-			emission = vec3(1.0, 0.82, 0.5) * lit * night * 2.0;
+			float pick = hash(vec2(floor(u / window_spacing) + building_seed, level));
+			float lit = step(0.68, pick);
+			vec3 warm = mix(vec3(1.0, 0.72, 0.4), vec3(0.85, 0.9, 1.0), step(0.9, pick));
+			emission = warm * lit * night * 0.9;
 		}
 	} else {
 		albedo *= 0.55;

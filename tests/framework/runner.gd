@@ -4,6 +4,7 @@ extends SceneTree
 ## Usage:
 ##   godot --headless --fixed-fps 60 -s res://tests/framework/runner.gd -- \
 ##       --suite=unit|integration|system|all [--filter=text] [--junit=res://reports/x.xml]
+##       [--file=text] [--exclude-file=text]   (only / skip test files whose name contains text)
 ##
 ## Discovers `test_*.gd` files under res://tests/<suite>/, runs every `test_*`
 ## method, prints a report, optionally writes JUnit XML and a GitHub job
@@ -13,6 +14,8 @@ const SUITES := ["unit", "integration", "system"]
 
 var _suite := "all"
 var _filter := ""
+var _file_filter := ""
+var _file_exclude := ""
 var _junit_path := ""
 var _results: Array[Dictionary] = []
 
@@ -28,6 +31,10 @@ func _parse_args() -> void:
 			_suite = arg.trim_prefix("--suite=")
 		elif arg.begins_with("--filter="):
 			_filter = arg.trim_prefix("--filter=")
+		elif arg.begins_with("--file="):
+			_file_filter = arg.trim_prefix("--file=")
+		elif arg.begins_with("--exclude-file="):
+			_file_exclude = arg.trim_prefix("--exclude-file=")
 		elif arg.begins_with("--junit="):
 			_junit_path = arg.trim_prefix("--junit=")
 
@@ -57,6 +64,10 @@ func _discover(dir_path: String) -> PackedStringArray:
 		found.append_array(_discover(dir_path.path_join(sub)))
 	for file in dir.get_files():
 		if file.begins_with("test_") and file.ends_with(".gd"):
+			if not _file_filter.is_empty() and not file.contains(_file_filter):
+				continue
+			if not _file_exclude.is_empty() and file.contains(_file_exclude):
+				continue
 			found.append(dir_path.path_join(file))
 	found.sort()
 	return found

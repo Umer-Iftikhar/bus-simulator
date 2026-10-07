@@ -24,10 +24,11 @@ if grep -qE "$ERROR_PATTERN" "$REPORTS/import.log"; then
   exit 1
 fi
 
-LOG="$REPORTS/$SUITE.log"
+REPORT_NAME="${REPORT_NAME:-$SUITE}"
+LOG="$REPORTS/$REPORT_NAME.log"
 "$GODOT" --headless --path "$ROOT" --fixed-fps 60 \
   -s res://tests/framework/runner.gd -- \
-  --suite="$SUITE" --junit="res://reports/$SUITE.xml" "$@" 2>&1 | tee "$LOG"
+  --suite="$SUITE" --junit="res://reports/$REPORT_NAME.xml" "$@" 2>&1 | tee "$LOG"
 status=${PIPESTATUS[0]}
 
 if grep -qE "$ERROR_PATTERN" "$LOG"; then

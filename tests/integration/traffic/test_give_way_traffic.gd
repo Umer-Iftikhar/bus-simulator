@@ -9,13 +9,13 @@ var traffic: TrafficManager
 
 
 func before_each() -> void:
-	map = Maps.harbor()
+	map = Maps.islamabad()
 	track = map.track()
 	world = add_child_autofree(GameWorld.create(map))
 	bus = Bus.create(Catalog.bus_spec("city"))
 	world.add_child(bus)
 	var xform := track.vehicle_transform(0, 200.0)
-	xform.origin.y = 0.3
+	xform.origin.y += 0.3
 	bus.global_transform = xform
 	traffic = TrafficManager.create(track, bus)
 	world.add_child(traffic)

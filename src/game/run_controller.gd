@@ -49,6 +49,13 @@ func _ready() -> void:
 		_stop_progress.append(track.distance_ahead(_last_offset, map.stop_offset(i)))
 	for stop in stops:
 		stop.set_waiting(route.waiting_at(stop.stop_index))
+	_highlight_next()
+
+
+## Shows the beacon over the next stop only.
+func _highlight_next() -> void:
+	for stop in stops:
+		stop.set_highlighted(not route.is_finished() and stop.stop_index == route.next_stop)
 
 
 func next_stop() -> BusStop:
@@ -74,6 +81,7 @@ func _physics_process(delta: float) -> void:
 		route.skip_stop(index)
 		dwell.reset()
 		stop.set_waiting(0)
+		_highlight_next()
 		stop_missed.emit(index)
 
 
@@ -96,6 +104,7 @@ func _passed(index: int) -> bool:
 func _serve(index: int) -> void:
 	var outcome := route.serve_stop(index)
 	stops[index].set_waiting(route.waiting_at(index))
+	_highlight_next()
 	stop_served.emit(index, outcome["alighted"], outcome["boarded"], outcome["left_behind"])
 	if route.is_finished():
 		_finish()

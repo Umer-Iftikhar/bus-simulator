@@ -26,7 +26,8 @@ func test_map_fields_are_valid() -> void:
 		assert_ge(map.stops.size(), 3, where + ": needs terminals plus a stop")
 		assert_ge(map.traffic_cars, 0, where)
 		assert_gt(map.building_colors.size(), 0, where)
-		assert_le(map.building_height.x, map.building_height.y, where)
+		assert_le(map.floors.x, map.floors.y, where)
+		assert_eq(map.heights.size(), map.points.size(), where + ": a height per point")
 
 
 func test_stops_are_ordered_inside_the_loop_and_spaced_apart() -> void:
@@ -81,7 +82,7 @@ func test_bends_are_drivable_by_a_bus() -> void:
 
 
 func test_stop_offset_matches_fraction() -> void:
-	var map := Maps.harbor()
+	var map := Maps.islamabad()
 	assert_almost_eq(map.stop_offset(1), map.stops[1] * map.track().length(), 0.001)
 
 
@@ -109,3 +110,63 @@ func test_busiest_map_pays_best() -> void:
 		if busiest == null or map.traffic_cars > busiest.traffic_cars:
 			busiest = map
 	assert_eq(busiest.fare, best_fare, "the hardest map rewards it")
+
+
+func test_every_stop_has_a_real_name() -> void:
+	for map in Maps.all():
+		assert_eq(map.stop_names.size(), map.stops.size(), map.id)
+		for i in map.stops.size():
+			assert_false(map.stop_name(i).begins_with("Stop "), "%s stop %d named" % [map.id, i])
+
+
+func test_bridges_and_landmarks_are_well_formed() -> void:
+	for map in Maps.all():
+		for bridge in map.bridges:
+			assert_between(bridge.x, 0, map.points.size() - 1, map.id)
+			assert_between(bridge.y, 0, map.points.size() - 1, map.id)
+			assert_gt(map.heights[bridge.x], 3.0, "%s deck raised" % map.id)
+		for landmark in map.landmarks:
+			assert_has(Landmarks.TYPES, landmark["type"], map.id)
+		assert_true(WorldLook.BACKDROPS.has(map.backdrop), map.id)
+		assert_has(["nyc", "tokyo", "washington", "islamabad", "rawalakot"], map.style)
+
+
+func test_water_only_meets_the_road_under_bridges() -> void:
+	for map in Maps.all():
+		var terrain := Terrain.create(map)
+		var track := map.track()
+		var offset := 0.0
+		while offset < track.length():
+			if not map.on_bridge(offset):
+				var p := track.position_at(offset)
+				var d := terrain.water_distance(p.x, p.z)
+				assert_gt(d, track.half_width(), "%s road in water at %.0f" % [map.id, offset])
+			offset += 5.0
+
+
+func test_stops_sit_on_flat_road_off_the_bridges() -> void:
+	for map in Maps.all():
+		for i in map.stops.size():
+			var offset := map.stop_offset(i)
+			assert_false(map.on_bridge(offset), "%s stop %d on a bridge" % [map.id, i])
+			var grade := absf(map.track().grade_at(offset))
+			# Mountain towns have hillside stops; city stops are flat.
+			var limit := 0.07 if map.terrain_amplitude > 50.0 else 0.04
+			assert_lt(grade, limit, "%s stop %d too steep to pull up" % [map.id, i])
+
+
+func test_city_maps_come_from_real_places() -> void:
+	var ids := Maps.ids()
+	for expected in ["tokyo", "washington", "islamabad", "rawalakot", "new_york"]:
+		assert_has(ids, expected)
+	assert_true(Maps.get_map("rawalakot").terrain_amplitude > 50.0, "Rawalakot is mountainous")
+	assert_true(Maps.get_map("tokyo").night, "Tokyo by night")
+
+
+func test_stops_are_well_spread_out() -> void:
+	for map in Maps.all():
+		var count := map.stops.size()
+		assert_between(count, 5, 6, "%s a handful of stops" % map.id)
+		for i in count - 1:
+			var gap := (map.stops[i + 1] - map.stops[i]) * map.track().length()
+			assert_gt(gap, 420.0, "%s stops %d-%d only %.0fm apart" % [map.id, i, i + 1, gap])

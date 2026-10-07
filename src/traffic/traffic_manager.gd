@@ -26,6 +26,8 @@ var track: Track
 var bus: Bus
 ## Lane the player is signalling into (see [Indicators]); -1 when not signalling.
 var signal_lane := -1
+## When set, a share of cars wear this colour (NYC yellow cabs).
+var taxi_color := Color.TRANSPARENT
 var cars: Array[TrafficCar] = []
 var follow := CarFollow.new()
 
@@ -48,7 +50,10 @@ func spawn(count: int, seed_value: int, bus_offset: float) -> void:
 		var lane := i % Track.LANE_COUNT
 		var slot := float(i) / count
 		var offset := bus_offset + SPAWN_CLEAR_AHEAD + usable * slot + rng.randf_range(-4.0, 4.0)
-		var car := TrafficCar.create(track, lane, offset, COLORS[i % COLORS.size()])
+		var color: Color = COLORS[i % COLORS.size()]
+		if taxi_color != Color.TRANSPARENT and rng.randf() < 0.4:
+			color = taxi_color
+		var car := TrafficCar.create(track, lane, offset, color)
 		car.name = "Car%d" % i
 		car.desired_speed = rng.randf_range(8.5, 12.5)
 		car.speed = car.desired_speed * 0.6

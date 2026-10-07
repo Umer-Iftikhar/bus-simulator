@@ -15,6 +15,7 @@ var _bus_inside := false
 var _figures: Node3D
 var _label: Label3D
 var _waiting := 0
+var _beacon: Node3D
 
 
 static func create(
@@ -44,48 +45,182 @@ func _build(track: Track) -> void:
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
 
-	# Kerb lane marking: a yellow box painted on the road.
-	var marking := MeshInstance3D.new()
-	marking.name = "Marking"
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(Track.LANE_WIDTH - 0.4, ZONE_LENGTH)
-	var paint := StandardMaterial3D.new()
-	paint.albedo_color = (
-		Color(1.0, 0.8, 0.1, 0.3) if not is_terminal else Color(0.3, 0.65, 1.0, 0.3)
-	)
-	paint.roughness = 0.7
-	paint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	plane.material = paint
-	marking.mesh = plane
-	marking.position.y = 0.04
-	add_child(marking)
-
-	# Shelter on the sidewalk to the right (-X in vehicle space).
-	var sidewalk_x := -(Track.LANE_WIDTH / 2.0 + Track.SHOULDER + GameWorld.SIDEWALK_WIDTH / 2.0)
-	var shelter := MeshInstance3D.new()
-	shelter.name = "Shelter"
-	var roof := BoxMesh.new()
-	roof.size = Vector3(1.6, 0.15, 5.0)
-	var roof_material := StandardMaterial3D.new()
-	roof_material.albedo_color = Color(0.25, 0.3, 0.35)
-	roof.material = roof_material
-	shelter.mesh = roof
-	shelter.position = Vector3(sidewalk_x - 0.3, 2.6, 0.0)
-	add_child(shelter)
+	_build_bay()
+	_build_shelter()
+	_build_beacon()
 
 	_label = Label3D.new()
 	_label.name = "Sign"
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.font_size = 64
 	_label.outline_size = 12
-	_label.position = Vector3(sidewalk_x, 3.6, 3.0)
+	_label.position = Vector3(_sidewalk_x(), 4.2, 3.0)
 	add_child(_label)
 
 	_figures = Node3D.new()
 	_figures.name = "Figures"
-	_figures.position = Vector3(sidewalk_x, 0.0, 0.0)
+	_figures.position = Vector3(_sidewalk_x(), GameWorld.KERB_HEIGHT, 0.0)
 	add_child(_figures)
 	set_waiting(0)
+
+
+## Centre of the pavement beside the stop (bus-local: -X is the kerb side).
+static func _sidewalk_x() -> float:
+	return -(Track.LANE_WIDTH / 2.0 + Track.SHOULDER + GameWorld.SIDEWALK_WIDTH / 2.0)
+
+
+static func _mat(color: Color, roughness := 0.6) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = roughness
+	return material
+
+
+func _part(
+	part_name: String, mesh: PrimitiveMesh, at: Vector3, material: Material
+) -> MeshInstance3D:
+	mesh.material = material
+	var instance := MeshInstance3D.new()
+	instance.name = part_name
+	instance.mesh = mesh
+	instance.position = at
+	add_child(instance)
+	return instance
+
+
+func _box(size: Vector3) -> BoxMesh:
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	return mesh
+
+
+## The bus bay: a painted box outline with "BUS" lettering on the road.
+func _build_bay() -> void:
+	var color := Color(1.0, 0.82, 0.1) if not is_terminal else Color(0.35, 0.7, 1.0)
+	var paint := _mat(color, 0.7)
+	var half_w := Track.LANE_WIDTH / 2.0 - 0.25
+	var half_l := ZONE_LENGTH / 2.0
+	_part("BayFront", _box(Vector3(half_w * 2.0, 0.02, 0.2)), Vector3(0, 0.035, half_l), paint)
+	_part("BayBack", _box(Vector3(half_w * 2.0, 0.02, 0.2)), Vector3(0, 0.035, -half_l), paint)
+	for side in [1.0, -1.0]:
+		_part(
+			"BaySide",
+			_box(Vector3(0.2, 0.02, ZONE_LENGTH)),
+			Vector3(side * half_w, 0.035, 0),
+			paint
+		)
+	var tint := StandardMaterial3D.new()
+	tint.albedo_color = Color(color.r, color.g, color.b, 0.16)
+	tint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var fill := PlaneMesh.new()
+	fill.size = Vector2(half_w * 2.0, ZONE_LENGTH)
+	_part("Marking", fill, Vector3(0, 0.03, 0), tint)
+	var word := Label3D.new()
+	word.name = "BayText"
+	word.text = "BUS STOP" if not is_terminal else "TERMINAL"
+	word.font_size = 96
+	word.pixel_size = 0.012
+	word.modulate = color
+	word.shaded = true
+	word.rotation = Vector3(-PI / 2.0, PI, 0)
+	word.position = Vector3(0, 0.05, 3.5)
+	add_child(word)
+
+
+## A real-looking shelter: posts, roof, back wall, glass side, bench,
+## timetable board and a tall pole sign.
+func _build_shelter() -> void:
+	var x := _sidewalk_x()
+	var kerb := GameWorld.KERB_HEIGHT
+	var frame := _mat(Color(0.2, 0.22, 0.25), 0.4)
+	frame.metallic = 0.6
+	var glass := StandardMaterial3D.new()
+	glass.albedo_color = Color(0.6, 0.7, 0.75, 0.25)
+	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glass.cull_mode = BaseMaterial3D.CULL_DISABLED
+	glass.roughness = 0.05
+	var back := x - 0.85
+	_part("Shelter", _box(Vector3(1.9, 0.12, 5.2)), Vector3(x - 0.2, kerb + 2.6, 0), frame)
+	for z in [-2.5, 2.5]:
+		for px in [back, x + 0.6]:
+			_part("ShelterPost", _box(Vector3(0.08, 2.55, 0.08)), Vector3(px, kerb + 1.3, z), frame)
+	_part("ShelterBack", _box(Vector3(0.04, 2.0, 5.0)), Vector3(back, kerb + 1.25, 0), glass)
+	_part("ShelterSide", _box(Vector3(1.4, 2.0, 0.04)), Vector3(x - 0.15, kerb + 1.25, -2.5), glass)
+	_part(
+		"ShelterBench",
+		_box(Vector3(0.45, 0.08, 2.4)),
+		Vector3(back + 0.3, kerb + 0.5, 0.6),
+		_mat(Color(0.45, 0.3, 0.18), 0.8)
+	)
+	var advert := _mat(Color(0.95, 0.92, 0.85), 0.5)
+	advert.emission_enabled = true
+	advert.emission = Color(0.95, 0.92, 0.85)
+	advert.emission_energy_multiplier = 0.4
+	_part(
+		"Timetable", _box(Vector3(0.06, 1.2, 0.9)), Vector3(back + 0.05, kerb + 1.4, -1.6), advert
+	)
+	# Pole sign at the front of the stop, where the bus doors stop.
+	var pole := CylinderMesh.new()
+	pole.top_radius = 0.05
+	pole.bottom_radius = 0.05
+	pole.height = 3.2
+	_part("SignPole", pole, Vector3(x + 0.7, kerb + 1.6, ZONE_LENGTH / 2.0 - 1.5), frame)
+	var disc := CylinderMesh.new()
+	disc.top_radius = 0.38
+	disc.bottom_radius = 0.38
+	disc.height = 0.05
+	var plate := _part(
+		"SignPlate",
+		disc,
+		Vector3(x + 0.7, kerb + 3.0, ZONE_LENGTH / 2.0 - 1.5),
+		_mat(Color(0.1, 0.35, 0.75), 0.4)
+	)
+	plate.rotation = Vector3(0, 0, PI / 2.0)
+	var letters := Label3D.new()
+	letters.name = "SignLetters"
+	letters.text = "BUS"
+	letters.font_size = 48
+	letters.pixel_size = 0.006
+	letters.outline_size = 0
+	letters.position = Vector3(x + 0.74, kerb + 3.0, ZONE_LENGTH / 2.0 - 1.5)
+	letters.rotation = Vector3(0, PI / 2.0, 0)
+	add_child(letters)
+
+
+## A tall glowing marker shown above the next stop so you can find it from afar.
+func _build_beacon() -> void:
+	_beacon = Node3D.new()
+	_beacon.name = "Beacon"
+	_beacon.position = Vector3(0, 0, 0)
+	add_child(_beacon)
+	var glow := StandardMaterial3D.new()
+	glow.albedo_color = Color(0.2, 1.0, 0.45, 0.5)
+	glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glow.emission_enabled = true
+	glow.emission = Color(0.2, 1.0, 0.45)
+	glow.emission_energy_multiplier = 2.0
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var arrow := CylinderMesh.new()
+	arrow.top_radius = 1.0
+	arrow.bottom_radius = 0.0
+	arrow.height = 1.6
+	arrow.material = glow
+	var tip := MeshInstance3D.new()
+	tip.name = "Arrow"
+	tip.mesh = arrow
+	tip.position.y = 7.0
+	tip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_beacon.add_child(tip)
+	_beacon.visible = false
+
+
+## Marks this stop as the next one to serve.
+func set_highlighted(on: bool) -> void:
+	_beacon.visible = on
+
+
+func is_highlighted() -> bool:
+	return _beacon.visible
 
 
 func bus_inside() -> bool:
