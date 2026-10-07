@@ -11,6 +11,7 @@ extends Node3D
 ##   "mirror_refresh": int, render mirrors every Nth frame (default 1)
 ##   "graphics": GraphicsSettings preset name (overrides mirror_refresh)
 ##   "cosmetics": {category: item id} visual customisation
+##   "auto_indicators": bool, signal automatically (default false: manual)
 
 signal run_finished(result: Dictionary)
 signal exit_requested
@@ -31,12 +32,16 @@ var run: RunController
 var damage: DamageModel
 var traffic: TrafficManager
 var indicators := Indicators.new()
+## Set when the "Automatic" indicator setting is on.
+var auto_indicator: AutoIndicator
 var mirrors: MirrorRig
 var mirror_panel: MirrorPanel
 var ui: CanvasLayer
 var hud: Hud
 var touch_controls: TouchControls
 var results_panel: ResultsPanel
+var _since_served := INF
+var _last_lateral := 0.0
 
 
 static func create(map_def: MapDef, bus_spec: BusSpec, session_options := {}) -> DriveSession:
@@ -61,6 +66,9 @@ func _ready() -> void:
 	horn = Horn.new()
 	bus.add_child(horn)
 	bus.set_headlights(map.night)
+	if options.get("auto_indicators", false):
+		auto_indicator = AutoIndicator.new()
+		_last_lateral = world.track.lateral_of(bus.global_position)
 	mirrors = MirrorRig.create(bus, options.get("mirror_refresh", 1))
 	bus.add_child(mirrors)
 
@@ -141,15 +149,30 @@ func current_lane() -> int:
 
 
 func _physics_process(delta: float) -> void:
+	if auto_indicator != null:
+		_auto_signal(delta)
 	indicators.update(delta, current_lane())
 	var left := indicators.left_lamp()
 	var right := indicators.right_lamp()
 	bus.set_indicator_lamps(left, right)
 	bus.dash_left = left
 	bus.dash_right = right
-	touch_controls.show_headlights(bus.headlights_on)
+	touch_controls.show_lights(bus.light_mode)
 	touch_controls.show_indicators(left, right)
 	traffic.signal_lane = indicators.target_lane
+
+
+func _auto_signal(delta: float) -> void:
+	_since_served += delta
+	var lateral := world.track.lateral_of(bus.global_position)
+	# Lane 1 lies at a smaller lateral than lane 0, so leftward drift is -d(lateral).
+	var drift := -(lateral - _last_lateral) / delta if delta > 0.0 else 0.0
+	_last_lateral = lateral
+	var lane := current_lane()
+	var wish := AutoIndicator.desired(
+		run.distance_to_next_stop(), lane, bus.forward_speed(), drift, _since_served
+	)
+	auto_indicator.apply(indicators, wish, lane)
 
 
 func _on_gear_requested() -> void:
@@ -223,6 +246,7 @@ func _on_wrecked() -> void:
 
 
 func _on_stop_served(stop_index: int, alighted: int, boarded: int, left_behind: int) -> void:
+	_since_served = 0.0
 	bus.open_doors()
 	get_tree().create_timer(DOOR_OPEN_SECONDS, false, true).timeout.connect(_close_doors)
 	var text := "%s: %d on, %d off" % [map.stop_name(stop_index), boarded, alighted]

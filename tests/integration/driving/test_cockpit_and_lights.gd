@@ -109,8 +109,39 @@ func test_headlights_light_up_the_road_and_cabin() -> void:
 		assert_ge(lamp.spot_range, 60.0)
 	assert_true(bus.body.cabin_light.visible, "cabin lit at night")
 	assert_gt(bus.body.head_material.emission_energy_multiplier, 2.0, "lenses glow")
-	bus.toggle_headlights()
+	bus.set_headlights(false)
 	assert_false(bus.body.cabin_light.visible)
+
+
+func test_light_switch_cycles_off_low_high_off() -> void:
+	assert_eq(bus.light_mode, Bus.LIGHTS_OFF)
+	bus.cycle_lights()
+	assert_eq(bus.light_mode, Bus.LOW_BEAM)
+	var low_range := bus.headlights[0].spot_range
+	var low_angle := bus.headlights[0].spot_angle
+	var low_pitch := bus.headlights[0].rotation.x
+	assert_eq(bus.body.high_beam_lamp.material_override, bus.body.high_beam_off)
+	bus.cycle_lights()
+	assert_eq(bus.light_mode, Bus.HIGH_BEAM)
+	assert_true(bus.headlights_on)
+	for lamp in bus.headlights:
+		assert_true(lamp.visible)
+		assert_gt(lamp.spot_range, low_range * 1.5, "high beam reaches much further")
+		assert_lt(lamp.spot_angle, low_angle, "in a tighter cone")
+		assert_gt(lamp.rotation.x, low_pitch, "aimed up toward the horizon")
+	assert_eq(bus.body.high_beam_lamp.material_override, bus.body.high_beam_on, "blue tell-tale")
+	bus.cycle_lights()
+	assert_eq(bus.light_mode, Bus.LIGHTS_OFF)
+	assert_false(bus.headlights_on)
+	for lamp in bus.headlights:
+		assert_false(lamp.visible)
+
+
+func test_low_beam_dips_toward_the_road() -> void:
+	bus.set_headlights(true)
+	assert_eq(bus.light_mode, Bus.LOW_BEAM)
+	for lamp in bus.headlights:
+		assert_lt(lamp.rotation.x, -0.05, "pitched down so it does not dazzle")
 
 
 func test_brake_lights_brighten_when_braking() -> void:

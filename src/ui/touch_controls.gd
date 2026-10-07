@@ -16,13 +16,15 @@ const MARGIN := 24.0
 var wheel := TouchSteeringWheel.new()
 var gas := TouchPedal.new("GAS")
 var brake_pedal := TouchPedal.new("BRAKE")
-var camera_button := TouchButton.new("CAM")
-var horn_button := TouchButton.new("HORN")
-var menu_button := TouchButton.new("MENU")
-var indicator_left_button := TouchButton.new("<", Vector2(96, 64))
-var indicator_right_button := TouchButton.new(">", Vector2(96, 64))
-var gear_button := TouchButton.new("D", Vector2(110, 64))
-var lights_button := TouchButton.new("LIGHT", Vector2(96, 72))
+var camera_button := TouchButton.new("CAM", Vector2(80, 80))
+var horn_button := TouchButton.new("HORN", Vector2(84, 84))
+var menu_button := TouchButton.new("MENU", Vector2(72, 72))
+var indicator_left_button := TouchButton.new("<", Vector2(96, 60))
+var indicator_right_button := TouchButton.new(">", Vector2(96, 60))
+var gear_button := TouchButton.new("D", Vector2(76, 120))
+var lights_button := TouchButton.new("LIGHT", Vector2(80, 80))
+## Matches [member Bus.light_mode]: 0 off, 1 low beam, 2 high beam.
+var light_mode := 0
 
 
 func _init() -> void:
@@ -39,8 +41,23 @@ func _init() -> void:
 	indicator_right_button.name = "IndicatorRight"
 	gear_button.name = "GearButton"
 	lights_button.name = "LightsButton"
-	gas.base_color = Color(0.1, 0.45, 0.15, 0.55)
-	brake_pedal.base_color = Color(0.5, 0.1, 0.1, 0.55)
+	# Accelerator: tall and narrow. Brake: a wide pad.
+	gas.custom_minimum_size = Vector2(92, 190)
+	gas.size = gas.custom_minimum_size
+	brake_pedal.custom_minimum_size = Vector2(160, 150)
+	brake_pedal.size = brake_pedal.custom_minimum_size
+	brake_pedal.wide = true
+	for pair in [
+		[camera_button, "camera"],
+		[horn_button, "horn"],
+		[menu_button, "menu"],
+		[lights_button, "light"],
+	]:
+		pair[0].style = "round"
+		pair[0].icon = pair[1]
+	indicator_left_button.style = "arrow_left"
+	indicator_right_button.style = "arrow_right"
+	gear_button.style = "gear"
 	for control in [
 		wheel,
 		gas,
@@ -78,7 +95,9 @@ func _layout() -> void:
 	camera_button.position = Vector2(area.x - camera_button.size.x - MARGIN, MARGIN)
 	horn_button.position = Vector2(wheel.position.x + wheel.size.x + 18.0, area.y - 96.0)
 	menu_button.position = Vector2((area.x - menu_button.size.x) / 2.0, MARGIN)
-	gear_button.position = Vector2(gas.position.x, gas.position.y - gear_button.size.y - 14.0)
+	gear_button.position = Vector2(
+		area.x - gear_button.size.x - MARGIN, gas.position.y - gear_button.size.y - 14.0
+	)
 	lights_button.position = Vector2(camera_button.position.x - lights_button.size.x - 14.0, MARGIN)
 	var above_wheel := wheel.position.y - indicator_left_button.size.y - 14.0
 	indicator_left_button.position = Vector2(wheel.position.x, above_wheel)
@@ -99,8 +118,15 @@ func show_gear(reverse: bool) -> void:
 	gear_button.queue_redraw()
 
 
-func show_headlights(on: bool) -> void:
-	lights_button.set_lit(on)
+## Shows the light switch: green low-beam icon, blue high-beam icon, white when off.
+func show_lights(mode: int) -> void:
+	if mode == light_mode:
+		return
+	light_mode = mode
+	lights_button.icon = "light_high" if mode == 2 else "light"
+	lights_button.glow = [Color(0, 0, 0, 0), ControlArt.LOW_BEAM, ControlArt.HIGH_BEAM][mode]
+	lights_button.set_lit(mode != 0)
+	lights_button.queue_redraw()
 
 
 func steer() -> float:

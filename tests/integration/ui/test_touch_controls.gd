@@ -136,6 +136,12 @@ func test_gear_and_light_buttons() -> void:
 	assert_true(controls.gear_button.lit)
 	controls.show_gear(false)
 	assert_eq(controls.gear_button.label, "D")
+	controls.show_lights(Bus.HIGH_BEAM)
+	assert_eq(controls.lights_button.icon, "light_high")
+	assert_true(controls.lights_button.lit)
+	controls.show_lights(Bus.LIGHTS_OFF)
+	assert_false(controls.lights_button.lit)
+	assert_eq(controls.lights_button.icon, "light")
 
 
 func test_hidden_button_releases_its_hold() -> void:
@@ -159,3 +165,30 @@ func test_touches_route_through_viewport_to_widgets() -> void:
 	get_tree().root.push_input(event)
 	await wait_process_frames(1)
 	assert_eq(controls.throttle(), 0.0)
+
+
+func test_controls_have_realistic_shapes() -> void:
+	assert_eq(controls.indicator_left_button.style, "arrow_left")
+	assert_eq(controls.indicator_right_button.style, "arrow_right")
+	assert_eq(controls.gear_button.style, "gear")
+	for button in [
+		controls.horn_button, controls.camera_button, controls.menu_button, controls.lights_button
+	]:
+		assert_eq(button.style, "round", button.name)
+		assert_false(button.icon.is_empty(), button.name)
+	assert_true(controls.brake_pedal.wide, "brake is a wide pad")
+	assert_false(controls.gas.wide)
+	assert_gt(controls.gas.size.y, controls.gas.size.x * 1.6, "accelerator is tall and narrow")
+	assert_gt(controls.brake_pedal.size.x, controls.gas.size.x * 1.4)
+
+
+func test_every_control_draws_without_errors() -> void:
+	controls.show_gear(true)
+	controls.show_lights(Bus.LOW_BEAM)
+	controls.show_indicators(true, true)
+	controls.wheel.wheel_angle = 1.2
+	controls.gas.held = true
+	for child in controls.get_children():
+		(child as Control).queue_redraw()
+	await wait_process_frames(2)
+	assert_true(controls.is_inside_tree())

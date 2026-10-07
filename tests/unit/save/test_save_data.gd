@@ -144,3 +144,17 @@ func test_old_paint_fields_migrate_into_cosmetics() -> void:
 	assert_eq(loaded.paint("minibus"), "ocean")
 	assert_true(loaded.owns_cosmetic("minibus", "paint", "ocean"))
 	assert_eq(loaded.cosmetic("minibus", "stripe"), "none")
+
+
+func test_indicator_setting_defaults_to_manual_and_round_trips() -> void:
+	var save := SaveData.new_game()
+	assert_false(save.auto_indicators())
+	save.settings["indicators"] = "auto"
+	var loaded := SaveData.from_dict(JSON.parse_string(JSON.stringify(save.to_dict())))
+	assert_true(loaded.auto_indicators())
+
+
+func test_unknown_indicator_mode_falls_back_to_manual() -> void:
+	var loaded := SaveData.from_dict({"settings": {"indicators": "telepathic"}})
+	assert_eq(loaded.settings["indicators"], "manual")
+	assert_false(SaveData.from_dict({"settings": {"graphics": "low"}}).auto_indicators())

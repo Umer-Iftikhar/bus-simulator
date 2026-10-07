@@ -56,6 +56,7 @@ func start_drive() -> void:
 		"performance": garage.performance(save.selected_bus),
 		"damage": save.damage(save.selected_bus),
 		"graphics": save.graphics(),
+		"auto_indicators": save.auto_indicators(),
 		"cosmetics": save.cosmetics(save.selected_bus),
 	}
 	if run_seed >= 0:

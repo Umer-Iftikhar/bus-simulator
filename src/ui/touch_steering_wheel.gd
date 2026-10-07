@@ -58,13 +58,4 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var c := _center()
-	var radius := minf(size.x, size.y) / 2.0 - 6.0
-	draw_circle(c, radius, Color(0.08, 0.08, 0.1, 0.45))
-	draw_arc(c, radius, 0.0, TAU, 64, Color(0.9, 0.9, 0.9, 0.85), 14.0, true)
-	for spoke in [-PI / 2.0, PI / 2.0, PI]:
-		var dir := Vector2.from_angle(spoke + wheel_angle)
-		draw_line(c, c + dir * radius, Color(0.9, 0.9, 0.9, 0.7), 10.0, true)
-	var marker := Vector2.from_angle(-PI / 2.0 + wheel_angle) * radius
-	draw_circle(c + marker, 10.0, Color(1.0, 0.6, 0.1))
-	draw_circle(c, radius * 0.22, Color(0.2, 0.2, 0.22, 0.9))
+	ControlArt.wheel(self, _center(), minf(size.x, size.y) / 2.0, wheel_angle)
