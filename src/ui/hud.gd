@@ -4,6 +4,8 @@ extends Control
 ## short status messages ("3 boarded, 1 alighted").
 
 const MESSAGE_SECONDS := 3.0
+## The "bus stop ahead" banner appears within this distance of the next stop.
+const APPROACH_DISTANCE := 400.0
 
 var speed_label := Label.new()
 var camera_label := Label.new()
@@ -13,6 +15,9 @@ var fares_label := Label.new()
 var health_label := Label.new()
 var message_label := Label.new()
 var info := VBoxContainer.new()
+var approach_panel := PanelContainer.new()
+var approach_title := Label.new()
+var approach_detail := Label.new()
 var _message_timer := 0.0
 var _reverse := false
 var _last_kmh := 0.0
@@ -49,6 +54,7 @@ func _init() -> void:
 	message_label.position.y = 110
 	_style(message_label)
 	add_child(message_label)
+	_build_approach_panel()
 	show_speed(0.0)
 	show_camera_mode(CameraModes.Mode.CHASE)
 	show_gear(false)
@@ -74,13 +80,62 @@ func show_camera_mode(mode: CameraModes.Mode) -> void:
 	camera_label.text = "Camera: %s" % CameraModes.mode_name(mode)
 
 
+func _build_approach_panel() -> void:
+	approach_panel.name = "ApproachPanel"
+	approach_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.25, 0.55, 0.85)
+	style.border_color = Color(1.0, 0.82, 0.1)
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(10)
+	style.set_content_margin_all(12)
+	approach_panel.add_theme_stylebox_override("panel", style)
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	approach_panel.add_child(column)
+	approach_title.name = "ApproachTitle"
+	approach_title.add_theme_font_size_override("font_size", 22)
+	approach_title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.1))
+	approach_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	approach_detail.name = "ApproachDetail"
+	approach_detail.add_theme_font_size_override("font_size", 34)
+	approach_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	for label in [approach_title, approach_detail]:
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		column.add_child(label)
+	approach_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	approach_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	approach_panel.position.y = 150
+	approach_panel.visible = false
+	add_child(approach_panel)
+
+
+## "850 m" below a kilometre (rounded to 10 m beyond 100 m), "1.2 km" above.
+static func format_distance(metres: float) -> String:
+	var m := maxf(metres, 0.0)
+	if m >= 1000.0:
+		return "%.1f km" % (m / 1000.0)
+	if m >= 100.0:
+		return "%d m" % (roundi(m / 10.0) * 10)
+	return "%d m" % roundi(m)
+
+
 func show_next_stop(stop_name: String, distance: float) -> void:
 	if stop_name.is_empty():
 		stop_label.text = "Route complete"
-	elif distance < 1.0:
+		approach_panel.visible = false
+		return
+	if distance < 1.0:
 		stop_label.text = "Next: %s (here)" % stop_name
 	else:
-		stop_label.text = "Next: %s (%d m)" % [stop_name, roundi(distance)]
+		stop_label.text = "Next: %s (%s)" % [stop_name, format_distance(distance)]
+	approach_panel.visible = distance <= APPROACH_DISTANCE
+	if distance < 1.0:
+		approach_title.text = "STOP HERE"
+		approach_detail.text = stop_name
+	else:
+		approach_title.text = "BUS STOP AHEAD"
+		approach_detail.text = "%s  ·  %s" % [stop_name, format_distance(distance)]
 
 
 func show_passengers(on_board: int, capacity: int) -> void:

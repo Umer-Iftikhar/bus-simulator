@@ -47,7 +47,7 @@ jobs:
     name: Integration tests
     needs: [lint, unit]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-godot
@@ -61,18 +61,38 @@ jobs:
           path: reports/
 
   system:
-    name: System tests
+    name: System tests (${{ matrix.shard }})
     needs: [integration]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: lap-islamabad
+            args: --file=full_lap --filter=lap_islamabad
+          - shard: lap-washington
+            args: --file=full_lap --filter=lap_washington
+          - shard: lap-rawalakot
+            args: --file=full_lap --filter=lap_rawalakot
+          - shard: lap-tokyo
+            args: --file=full_lap --filter=lap_tokyo
+          - shard: lap-new_york
+            args: --file=full_lap --filter=lap_new_york
+          - shard: lap-coverage
+            args: --file=full_lap --filter=every_map
+          - shard: gameplay
+            args: --exclude-file=full_lap
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-godot
         with:
           version: ${{ env.GODOT_VERSION }}
-      - run: tools/run_tests.sh system
+      - run: tools/run_tests.sh system ${{ matrix.args }}
+        env:
+          REPORT_NAME: system-${{ matrix.shard }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: report-system
+          name: report-system-${{ matrix.shard }}
           path: reports/

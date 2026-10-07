@@ -34,7 +34,7 @@ func test_full_route_pays_out_and_persists() -> void:
 	assert_true(result["completed"])
 	assert_eq(result["missed_stops"], 0)
 	assert_gt(result["delivered"], 5, "a full route moves real numbers of people")
-	assert_eq(result["payout"], result["delivered"] * Maps.harbor().fare)
+	assert_eq(result["payout"], result["delivered"] * Maps.islamabad().fare)
 	var session: DriveSession = driver.main.session
 	assert_not_null(session.results_panel, "results shown")
 	assert_true(session.results_panel.lines.text.contains("$%d" % result["payout"]))

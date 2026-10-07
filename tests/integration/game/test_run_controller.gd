@@ -8,7 +8,7 @@ var run: RunController
 
 
 func before_each() -> void:
-	map = Maps.harbor()
+	map = Maps.islamabad()
 	world = add_child_autofree(GameWorld.create(map))
 	bus = Bus.create(Catalog.bus_spec("city"))
 	world.add_child(bus)
@@ -20,7 +20,7 @@ func before_each() -> void:
 
 func _place(lane: int, offset: float) -> void:
 	var xform := map.track().vehicle_transform(lane, offset)
-	xform.origin.y = 0.3
+	xform.origin.y += 0.3
 	bus.global_transform = xform
 	bus.linear_velocity = Vector3.ZERO
 	bus.angular_velocity = Vector3.ZERO

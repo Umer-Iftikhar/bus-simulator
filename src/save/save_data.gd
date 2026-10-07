@@ -13,7 +13,7 @@ var wallet := Wallet.new()
 ##            "owned_cosmetics": {category: [ids]}, "damage": {part: health}}
 var owned := {}
 var selected_bus := Catalog.STARTER_BUS
-var selected_map := "harbor"
+var selected_map := "islamabad"
 var stats := {"runs": 0, "delivered": 0, "earned": 0}
 var settings := {"graphics": GraphicsSettings.DEFAULT}
 var money: int:
@@ -113,7 +113,7 @@ static func from_dict(data: Dictionary) -> SaveData:
 		save.owned[Catalog.STARTER_BUS] = default_owned_bus()
 	var bus := str(data.get("selected_bus", Catalog.STARTER_BUS))
 	save.selected_bus = bus if save.owned.has(bus) else Catalog.STARTER_BUS
-	var map := str(data.get("selected_map", "harbor"))
+	var map := str(data.get("selected_map", ""))
 	save.selected_map = map if Maps.get_map(map) != null else Maps.ids()[0]
 	var raw_settings = data.get("settings", {})
 	if raw_settings is Dictionary:

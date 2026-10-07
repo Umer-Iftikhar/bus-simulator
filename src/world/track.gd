@@ -5,6 +5,10 @@ extends RefCounted
 ## Traffic drives one way around the loop on [constant LANE_COUNT] lanes.
 ## Lane 0 is the right-hand (kerb) lane where bus stops sit; lane 1 is the
 ## left-hand overtaking lane. "Offset" means distance along the loop in metres.
+##
+## The centre line is laid out on the flat (x, z) plane; road elevation is a
+## separate smooth height profile along the loop (hills, bridge ramps), so
+## offsets, lanes and lateral distances are unaffected by slopes.
 
 const LANE_WIDTH := 3.5
 const LANE_COUNT := 2
@@ -16,9 +20,12 @@ const MAX_HANDLE_RATIO := 0.4
 
 var curve := Curve3D.new()
 var _length := 0.0
+## Control-point heights and their offsets along the loop.
+var _heights := PackedFloat32Array()
+var _height_offsets := PackedFloat32Array()
 
 
-static func from_points(points: PackedVector2Array) -> Track:
+static func from_points(points: PackedVector2Array, heights := PackedFloat32Array()) -> Track:
 	assert(points.size() >= 3, "a track needs at least three control points")
 	var track := Track.new()
 	track.curve.bake_interval = BAKE_INTERVAL
@@ -36,7 +43,59 @@ static func from_points(points: PackedVector2Array) -> Track:
 			Vector3(handle_out.x, 0.0, handle_out.y)
 		)
 	track._length = track.curve.get_baked_length()
+	if heights.size() == count:
+		track._heights = heights
+		for p in points:
+			track._height_offsets.append(track.curve.get_closest_offset(Vector3(p.x, 0.0, p.y)))
+		track._height_offsets[0] = 0.0
 	return track
+
+
+## Road surface height at [param offset]: a cubic Hermite spline through the
+## control-point heights, so slopes change smoothly (no kinks at ramp ends).
+func elevation_at(offset: float) -> float:
+	var count := _heights.size()
+	if count == 0:
+		return 0.0
+	var o := wrap_offset(offset)
+	var i := count - 1
+	for k in count:
+		var start := _height_offsets[k]
+		var end := _length if k == count - 1 else _height_offsets[k + 1]
+		if o >= start and o < end:
+			i = k
+			break
+	var j := (i + 1) % count
+	var start_offset := _height_offsets[i]
+	var segment := distance_ahead(start_offset, _height_offsets[j])
+	if segment <= 0.0:
+		segment = _length
+	var t := distance_ahead(start_offset, o) / segment
+	var t2 := t * t
+	var t3 := t2 * t
+	return (
+		(2.0 * t3 - 3.0 * t2 + 1.0) * _heights[i]
+		+ (t3 - 2.0 * t2 + t) * segment * _slope(i)
+		+ (-2.0 * t3 + 3.0 * t2) * _heights[j]
+		+ (t3 - t2) * segment * _slope(j)
+	)
+
+
+func _slope(k: int) -> float:
+	var count := _heights.size()
+	var prev := (k - 1 + count) % count
+	var next := (k + 1) % count
+	var span := distance_ahead(_height_offsets[prev], _height_offsets[next])
+	return (_heights[next] - _heights[prev]) / span if span > 0.0 else 0.0
+
+
+## Road gradient (rise over run) at [param offset].
+func grade_at(offset: float) -> float:
+	return (elevation_at(offset + 2.0) - elevation_at(offset - 2.0)) / 4.0
+
+
+func has_elevation() -> bool:
+	return not _heights.is_empty()
 
 
 func length() -> float:
@@ -53,7 +112,9 @@ func distance_ahead(from_offset: float, to_offset: float) -> float:
 
 
 func position_at(offset: float) -> Vector3:
-	return curve.sample_baked(wrap_offset(offset), true)
+	var flat := curve.sample_baked(wrap_offset(offset), true)
+	flat.y = elevation_at(offset)
+	return flat
 
 
 func forward_at(offset: float) -> Vector3:
@@ -77,11 +138,14 @@ func lane_position(lane: int, offset: float) -> Vector3:
 	return position_at(offset) + right_at(offset) * lane_lateral(lane)
 
 
-## Transform for a vehicle in [param lane] at [param offset] (+Z forward).
+## Transform for a vehicle in [param lane] at [param offset] (+Z forward),
+## pitched to follow the slope of the road.
 func vehicle_transform(lane: int, offset: float) -> Transform3D:
-	var forward := forward_at(offset)
-	var basis := Basis(Vector3.UP.cross(forward), Vector3.UP, forward)
-	return Transform3D(basis, lane_position(lane, offset))
+	var flat := forward_at(offset)
+	var forward := (flat + Vector3.UP * grade_at(offset)).normalized()
+	var side := Vector3.UP.cross(flat).normalized()
+	var up := forward.cross(side).normalized()
+	return Transform3D(Basis(side, up, forward), lane_position(lane, offset))
 
 
 func closest_offset(world_pos: Vector3) -> float:

@@ -102,7 +102,7 @@ func test_being_rear_ended_by_traffic_damages_the_rear() -> void:
 	world.add_child(car)
 	# Move the bus onto that car's lane and ram it from behind at 12 m/s.
 	var xform := track.vehicle_transform(0, offset)
-	xform.origin.y = 0.3
+	xform.origin.y += 0.3
 	bus.global_transform = xform
 	await wait_physics_frames(5)
 	for i in 240:

@@ -53,7 +53,7 @@ func step() -> void:
 ## [param skip] lists stop indices to drive straight past. Returns true when
 ## the run finished within the time limit.
 func drive_route(
-	tree: SceneTree, run: RunController, skip: Array = [], seconds_per_stop := 90.0
+	tree: SceneTree, run: RunController, skip: Array = [], seconds_per_stop := 240.0
 ) -> bool:
 	while not run.finished:
 		var index := run.route.next_stop

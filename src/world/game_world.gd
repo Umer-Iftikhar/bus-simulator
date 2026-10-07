@@ -1,27 +1,27 @@
 class_name GameWorld
 extends Node3D
-## The 3D world for one map: sky, light, ground, road surface and scenery.
+## The 3D world for one map: sky (with painted horizon), light, terrain with
+## rivers and lakes, the road (with real collision, so it can climb hills and
+## cross bridges), bridges, the city and its landmarks.
 ## Everything is generated deterministically from a [MapDef].
 
-const GROUND_MARGIN := 250.0
 const ROAD_STEP := 2.0
 const SIDEWALK_WIDTH := 2.5
-const BUILDING_SETBACK := 5.0
 const KERB_HEIGHT := 0.12
 const STREET_LIGHT_SPACING := 45.0
 const STREET_LIGHT_HEIGHT := 6.5
 
 var map: MapDef
 var track: Track
-## Footprints of generated buildings (for tests and traffic sanity checks).
-var building_rects: Array[Rect2] = []
+var terrain: Terrain
+var city: CityBuilder
+var bridges: BridgeBuilder
+var life: StreetLife
 var street_light_count := 0
 ## Where each street light stands (also kept for tests: headless renderers
 ## do not store MultiMesh instance data).
 var street_light_positions: Array[Vector3] = []
-var _building_material: ShaderMaterial
-var _trunk_material: StandardMaterial3D
-var _leaf_materials: Array[StandardMaterial3D] = []
+var _road_faces := PackedVector3Array()
 
 
 static func create(map_def: MapDef) -> GameWorld:
@@ -35,10 +35,21 @@ static func create(map_def: MapDef) -> GameWorld:
 
 func _build() -> void:
 	_build_environment()
-	_build_ground()
+	terrain = Terrain.create(map)
+	add_child(terrain.build())
+	_build_water()
 	_build_road()
 	_build_street_lights()
-	_build_scenery()
+	bridges = BridgeBuilder.build(map, self)
+	city = CityBuilder.build(map, terrain, self)
+	_build_landmarks()
+	life = StreetLife.create(map, city)
+	add_child(life)
+
+
+## Every building placed by the city builder (see [member CityBuilder.buildings]).
+func buildings() -> Array[Dictionary]:
+	return city.buildings
 
 
 func _build_environment() -> void:
@@ -49,43 +60,27 @@ func _build_environment() -> void:
 	add_child(WorldLook.sun(map))
 
 
-func _bounds() -> Rect2:
-	var rect := Rect2(map.points[0], Vector2.ZERO)
-	for p in map.points:
-		rect = rect.expand(p)
-	return rect.grow(GROUND_MARGIN)
-
-
-func _build_ground() -> void:
-	var bounds := _bounds()
-	var ground := StaticBody3D.new()
-	ground.name = "Ground"
-	ground.collision_layer = Layers.WORLD
-	ground.collision_mask = 0
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3(bounds.size.x, 2.0, bounds.size.y)
-	shape.shape = box
-	var center := bounds.get_center()
-	shape.position = Vector3(center.x, -1.0, center.y)
-	ground.add_child(shape)
-	var mesh_instance := MeshInstance3D.new()
+func _build_water() -> void:
+	if map.rivers.is_empty() and map.lakes.is_empty():
+		return
+	var water := MeshInstance3D.new()
+	water.name = "Water"
 	var plane := PlaneMesh.new()
-	plane.size = bounds.size
-	plane.material = WorldLook.ground(map)
-	mesh_instance.mesh = plane
-	mesh_instance.position = Vector3(center.x, 0.0, center.y)
-	ground.add_child(mesh_instance)
-	add_child(ground)
-	if map.has_water:
-		var water := MeshInstance3D.new()
-		water.name = "Water"
-		var water_plane := PlaneMesh.new()
-		water_plane.size = Vector2(bounds.size.x * 3.0, bounds.size.y * 3.0)
-		water_plane.material = WorldLook.water()
-		water.mesh = water_plane
-		water.position = Vector3(center.x, -0.4, center.y)
-		add_child(water)
+	plane.size = terrain.bounds.size
+	plane.material = WorldLook.water()
+	water.mesh = plane
+	var c := terrain.bounds.get_center()
+	water.position = Vector3(c.x, map.water_level, c.y)
+	add_child(water)
+
+
+func _build_landmarks() -> void:
+	for landmark in map.landmarks:
+		var at: Vector2 = landmark["at"]
+		var ground := terrain.height_at(at.x, at.y)
+		city.root.add_child(
+			Landmarks.build(landmark["type"], at, landmark["rotation"], ground, map.night)
+		)
 
 
 func _build_road() -> void:
@@ -93,10 +88,14 @@ func _build_road() -> void:
 	road.name = "Road"
 	add_child(road)
 	var half := track.half_width()
-	road.add_child(_strip("Asphalt", -half, half, 0.02, WorldLook.asphalt()))
+	road.add_child(_strip("Asphalt", -half, half, 0.02, WorldLook.asphalt(), 0.0, 0.0, true))
 	var pavement := WorldLook.sidewalk()
-	road.add_child(_strip("SidewalkRight", half, half + SIDEWALK_WIDTH, KERB_HEIGHT, pavement))
-	road.add_child(_strip("SidewalkLeft", -half - SIDEWALK_WIDTH, -half, KERB_HEIGHT, pavement))
+	road.add_child(
+		_strip("SidewalkRight", half, half + SIDEWALK_WIDTH, KERB_HEIGHT, pavement, 0.0, 0.0, true)
+	)
+	road.add_child(
+		_strip("SidewalkLeft", -half - SIDEWALK_WIDTH, -half, KERB_HEIGHT, pavement, 0.0, 0.0, true)
+	)
 	var kerb := WorldLook.kerb()
 	kerb.cull_mode = BaseMaterial3D.CULL_DISABLED
 	road.add_child(_kerb_face("KerbRight", half, kerb))
@@ -106,6 +105,17 @@ func _build_road() -> void:
 	road.add_child(_strip("EdgeRight", edge - 0.15, edge, 0.03, paint))
 	road.add_child(_strip("EdgeLeft", -edge, -edge + 0.15, 0.03, paint))
 	road.add_child(_strip("LaneDivider", -0.08, 0.08, 0.03, paint, 3.0, 9.0))
+	# The drivable surface: asphalt and pavements as one trimesh collider.
+	var body := StaticBody3D.new()
+	body.name = "RoadSurface"
+	body.collision_layer = Layers.WORLD
+	body.collision_mask = 0
+	var shape := CollisionShape3D.new()
+	var concave := ConcavePolygonShape3D.new()
+	concave.set_faces(_road_faces)
+	shape.shape = concave
+	body.add_child(shape)
+	road.add_child(body)
 
 
 ## Builds a ribbon mesh between two lateral offsets along the whole loop.
@@ -117,7 +127,8 @@ func _strip(
 	height: float,
 	material: Material,
 	dash := 0.0,
-	period := 0.0
+	period := 0.0,
+	collide := false
 ) -> MeshInstance3D:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -141,6 +152,8 @@ func _strip(
 		st.set_normal(Vector3.UP)
 		for v in [a0, b0, a1, a1, b0, b1]:
 			st.add_vertex(v)
+			if collide:
+				_road_faces.append(v)
 		offset += period if dash > 0.0 else step
 	var instance := MeshInstance3D.new()
 	instance.name = strip_name
@@ -220,136 +233,3 @@ func _multimesh(
 	instance.name = mesh_name
 	instance.multimesh = multimesh
 	return instance
-
-
-func _build_scenery() -> void:
-	_building_material = WorldLook.building(map)
-	_trunk_material = WorldLook.plain(Color(0.33, 0.23, 0.15), 1.0)
-	for shade in [-0.12, 0.0, 0.12]:
-		_leaf_materials.append(WorldLook.plain(map.tree_color.lightened(shade), 0.95))
-	var scenery := Node3D.new()
-	scenery.name = "Scenery"
-	add_child(scenery)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = map.scenery_seed
-	var clearance := track.half_width() + SIDEWALK_WIDTH + BUILDING_SETBACK
-	var offset := 0.0
-	while offset < track.length():
-		for side in [1.0, -1.0]:
-			var size := Vector3(
-				rng.randf_range(8.0, 16.0),
-				rng.randf_range(map.building_height.x, map.building_height.y),
-				rng.randf_range(8.0, 14.0)
-			)
-			var lateral: float = side * (clearance + size.x / 2.0 + rng.randf_range(0.0, 6.0))
-			var center := track.position_at(offset) + track.right_at(offset) * lateral
-			if rng.randf() < map.tree_chance:
-				_try_place_tree(scenery, center, clearance)
-			else:
-				_try_place_building(scenery, rng, center, offset, size, clearance)
-		offset += map.building_spacing
-
-
-func _try_place_building(
-	parent: Node3D,
-	rng: RandomNumberGenerator,
-	center: Vector3,
-	offset: float,
-	size: Vector3,
-	clearance: float
-) -> void:
-	var forward := track.forward_at(offset)
-	var basis := Basis(Vector3.UP.cross(forward), Vector3.UP, forward)
-	var radius := Vector2(size.x, size.z).length() / 2.0
-	if not _clear_of_road(center, radius, clearance):
-		return
-	var footprint := Rect2(
-		Vector2(center.x, center.z) - Vector2.ONE * radius, Vector2.ONE * radius * 2
-	)
-	for existing in building_rects:
-		if existing.intersects(footprint):
-			return
-	building_rects.append(footprint)
-	var body := StaticBody3D.new()
-	body.name = "Building%d" % building_rects.size()
-	body.collision_layer = Layers.WORLD
-	body.collision_mask = 0
-	body.transform = Transform3D(basis, center + Vector3.UP * size.y / 2.0)
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = size
-	shape.shape = box
-	body.add_child(shape)
-	var mesh_instance := MeshInstance3D.new()
-	mesh_instance.name = "Facade"
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	var color: Color = map.building_colors[rng.randi_range(0, map.building_colors.size() - 1)]
-	mesh_instance.mesh = mesh
-	mesh_instance.material_override = _building_material
-	mesh_instance.set_instance_shader_parameter("wall_color", color)
-	mesh_instance.set_instance_shader_parameter("building_seed", float(building_rects.size()))
-	body.add_child(mesh_instance)
-	parent.add_child(body)
-
-
-func _try_place_tree(parent: Node3D, center: Vector3, clearance: float) -> void:
-	if not _clear_of_road(center, 2.0, clearance - BUILDING_SETBACK + 1.0):
-		return
-	var tree := StaticBody3D.new()
-	tree.collision_layer = Layers.WORLD
-	tree.collision_mask = 0
-	tree.position = center
-	var shape := CollisionShape3D.new()
-	var trunk_shape := CylinderShape3D.new()
-	trunk_shape.radius = 0.35
-	trunk_shape.height = 3.0
-	shape.shape = trunk_shape
-	shape.position.y = 1.5
-	tree.add_child(shape)
-	# Deterministic per-tree variation from its position.
-	var vary := absf(sin(center.x * 12.9898 + center.z * 78.233))
-	var scale := 0.8 + vary * 0.6
-	var trunk := MeshInstance3D.new()
-	var trunk_mesh := CylinderMesh.new()
-	trunk_mesh.top_radius = 0.2
-	trunk_mesh.bottom_radius = 0.32
-	trunk_mesh.height = 3.0 * scale
-	trunk_mesh.material = _trunk_material
-	trunk.mesh = trunk_mesh
-	trunk.position.y = 1.5 * scale
-	tree.add_child(trunk)
-	var leaves := _leaf_materials[int(vary * 100.0) % _leaf_materials.size()]
-	if map.conifers:
-		for tier in 3:
-			var cone := MeshInstance3D.new()
-			var cone_mesh := CylinderMesh.new()
-			cone_mesh.top_radius = 0.0
-			cone_mesh.bottom_radius = (2.2 - tier * 0.55) * scale
-			cone_mesh.height = 3.0 * scale
-			cone_mesh.material = leaves
-			cone.mesh = cone_mesh
-			cone.position.y = (3.2 + tier * 1.6) * scale
-			tree.add_child(cone)
-	else:
-		for blob in 3:
-			var crown := MeshInstance3D.new()
-			var crown_mesh := SphereMesh.new()
-			crown_mesh.radius = (1.7 - blob * 0.3) * scale
-			crown_mesh.height = crown_mesh.radius * 1.8
-			crown_mesh.radial_segments = 16
-			crown_mesh.rings = 8
-			crown_mesh.material = leaves
-			crown.mesh = crown_mesh
-			var angle := blob * 2.1 + vary * 6.0
-			crown.position = Vector3(cos(angle) * 0.7, (3.6 + blob * 0.7) * scale, sin(angle) * 0.7)
-			tree.add_child(crown)
-	parent.add_child(tree)
-
-
-## True when a circle of [param radius] around [param center] keeps [param clearance]
-## metres from the road centre line everywhere on the loop.
-func _clear_of_road(center: Vector3, radius: float, clearance: float) -> bool:
-	var nearest := track.position_at(track.closest_offset(center))
-	nearest.y = 0.0
-	return Vector3(center.x, 0.0, center.z).distance_to(nearest) - radius >= clearance - 0.01

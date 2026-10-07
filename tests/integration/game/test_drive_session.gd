@@ -6,7 +6,7 @@ var session: DriveSession
 
 func _start(options := {}) -> void:
 	options["seed"] = options.get("seed", 5)
-	session = DriveSession.create(Maps.harbor(), Catalog.bus_spec("city"), options)
+	session = DriveSession.create(Maps.islamabad(), Catalog.bus_spec("city"), options)
 	add_child_autofree(session)
 	await wait_physics_frames(3)
 
@@ -29,7 +29,7 @@ func test_defaults_to_stock_performance() -> void:
 func test_hud_shows_route_information() -> void:
 	await _start()
 	await wait_process_frames(1)
-	assert_true(session.hud.stop_label.text.begins_with("Next: Harbor Terminal"))
+	assert_true(session.hud.stop_label.text.begins_with("Next: Zero Point"))
 	assert_eq(session.hud.passengers_label.text, "Passengers: 0 / 32")
 	assert_eq(session.hud.fares_label.text, "Fares: $0")
 
@@ -38,12 +38,12 @@ func test_serving_a_stop_flashes_message_and_updates_passengers() -> void:
 	await _start()
 	var run := session.run
 	var xform := session.world.track.vehicle_transform(0, session.map.stop_offset(0))
-	xform.origin.y = 0.3
+	xform.origin.y += 0.3
 	session.bus.global_transform = xform
 	await wait_seconds(2.0)
 	assert_eq(run.route.next_stop, 1)
 	assert_true(session.hud.message_label.visible)
-	assert_true(session.hud.message_label.text.begins_with("Harbor Terminal:"))
+	assert_true(session.hud.message_label.text.begins_with("Zero Point:"))
 	var expected := "Passengers: %d / 32" % run.route.on_board_count()
 	assert_eq(session.hud.passengers_label.text, expected)
 

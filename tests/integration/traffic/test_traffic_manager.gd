@@ -8,7 +8,7 @@ var traffic: TrafficManager
 
 
 func before_each() -> void:
-	map = Maps.harbor()
+	map = Maps.islamabad()
 	world = add_child_autofree(GameWorld.create(map))
 	bus = Bus.create(BusSpec.new())
 	world.add_child(bus)
@@ -20,7 +20,7 @@ func before_each() -> void:
 
 func _place_bus(lane: int, offset: float) -> void:
 	var xform := map.track().vehicle_transform(lane, offset)
-	xform.origin.y = 0.3
+	xform.origin.y += 0.3
 	bus.global_transform = xform
 	bus.linear_velocity = Vector3.ZERO
 
@@ -66,7 +66,9 @@ func test_cars_stay_on_their_lane_and_drive_forward() -> void:
 	for i in traffic.cars.size():
 		var car := traffic.cars[i]
 		assert_eq(track.lane_at(car.global_position), car.lane, "%s keeps its lane" % car.name)
-		assert_almost_eq(car.global_position.y, 0.0, 0.01)
+		assert_almost_eq(
+			car.global_position.y, track.position_at(car.offset).y, 0.05, "on the road"
+		)
 		assert_gt(track.distance_ahead(start[i], car.offset), 50.0, "%s moved on" % car.name)
 		assert_le(car.speed, car.desired_speed + 0.1)
 
@@ -114,7 +116,7 @@ func test_car_brakes_for_bus_straddling_lanes() -> void:
 	var track := map.track()
 	var xform := track.vehicle_transform(0, 6.0)
 	xform.origin += track.right_at(6.0) * -Track.LANE_WIDTH / 2.0
-	xform.origin.y = 0.3
+	xform.origin.y += 0.3
 	bus.global_transform = xform
 	var car := _car(1, track.wrap_offset(-60.0), 11.0, 11.0)
 	await wait_seconds(15.0)

@@ -7,7 +7,7 @@ var session: DriveSession
 func _start(options := {}) -> void:
 	options["seed"] = 8
 	options["traffic"] = false
-	session = DriveSession.create(Maps.harbor(), BusSpec.new(), options)
+	session = DriveSession.create(Maps.islamabad(), BusSpec.new(), options)
 	add_child_autofree(session)
 	await wait_physics_frames(3)
 

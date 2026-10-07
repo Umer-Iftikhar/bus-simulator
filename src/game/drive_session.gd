@@ -74,6 +74,8 @@ func _ready() -> void:
 
 	traffic = TrafficManager.create(world.track, bus)
 	add_child(traffic)
+	if map.style == "nyc":
+		traffic.taxi_color = Color(1.0, 0.78, 0.05)
 	if options.get("traffic", true):
 		traffic.spawn(map.traffic_cars, run_seed, SPAWN_OFFSET)
 
@@ -129,7 +131,7 @@ func _ready() -> void:
 ## Where the bus starts: kerb lane, just past the start of the loop, wheels just above ground.
 func spawn_transform() -> Transform3D:
 	var xform := world.track.vehicle_transform(0, SPAWN_OFFSET)
-	xform.origin.y = 0.3
+	xform.origin.y += 0.3
 	return xform
 
 

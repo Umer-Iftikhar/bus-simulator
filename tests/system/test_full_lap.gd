@@ -1,8 +1,11 @@
 extends TestCase
-## Every map must be drivable by every bus: an autopilot using the player's
-## input actions completes a full lap without leaving the road or rolling over.
+## Every map must be drivable: an autopilot using the player's input actions
+## completes a full lap (bridges, hills and all) without leaving the road or
+## rolling over, with the two most demanding buses: the long city bus (widest
+## turning circle) and the double decker (heaviest, tallest climber).
 
-const LAP_TIME_LIMIT := 240.0
+const LAP_TIME_LIMIT := 480.0
+const HARDEST_BUSES := ["long_city", "double_decker"]
 
 
 func after_each() -> void:
@@ -12,10 +15,38 @@ func after_each() -> void:
 	Input.action_release("steer_right")
 
 
-func test_every_bus_completes_a_lap_on_every_map() -> void:
-	for map in Maps.all():
-		for bus_id in Catalog.bus_ids():
-			await _drive_lap(map, bus_id)
+# One test per map so CI can run the maps in parallel shards.
+func test_lap_islamabad() -> void:
+	await _laps("islamabad")
+
+
+func test_lap_washington() -> void:
+	await _laps("washington")
+
+
+func test_lap_rawalakot() -> void:
+	await _laps("rawalakot")
+
+
+func test_lap_tokyo() -> void:
+	await _laps("tokyo")
+
+
+func test_lap_new_york() -> void:
+	await _laps("new_york")
+
+
+func test_there_is_a_lap_test_for_every_map() -> void:
+	var methods := (get_script() as Script).get_script_method_list().map(
+		func(m: Dictionary) -> String: return m["name"]
+	)
+	for map_id in Maps.ids():
+		assert_has(methods, "test_lap_" + map_id)
+
+
+func _laps(map_id: String) -> void:
+	for bus_id in HARDEST_BUSES:
+		await _drive_lap(Maps.get_map(map_id), bus_id)
 
 
 func _drive_lap(map: MapDef, bus_id: String) -> void:

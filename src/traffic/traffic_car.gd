@@ -42,16 +42,16 @@ func _build() -> void:
 	shape.shape = box
 	shape.position.y = 0.3 + (HEIGHT - 0.3) / 2.0
 	add_child(shape)
-	_build_visuals()
+	TrafficCar.build_visuals(self, color)
 
 
-## Car shape: painted lower body, tinted glass cabin with a painted roof,
-## four wheels, bumpers and head/tail lights.
-func _build_visuals() -> void:
-	var paint := StandardMaterial3D.new()
-	paint.albedo_color = color
-	paint.metallic = 0.45
-	paint.roughness = 0.3
+## Car shape on [param parent]: painted lower body, tinted glass cabin with a
+## painted roof, four wheels, bumpers and head/tail lights. A positive
+## [param fade_distance] hides the car beyond that range (parked cars).
+## The parts of a car in car-local space: [{"name", "mesh", "transform",
+## "material" (or null when the part takes the car's paint)}]. Shared by
+## moving traffic (one node per part) and parked cars (one MultiMesh per part).
+static func part_specs() -> Array[Dictionary]:
 	var glass := StandardMaterial3D.new()
 	glass.albedo_color = Color(0.1, 0.13, 0.17)
 	glass.metallic = 0.6
@@ -59,41 +59,73 @@ func _build_visuals() -> void:
 	var dark := StandardMaterial3D.new()
 	dark.albedo_color = Color(0.05, 0.05, 0.06)
 	dark.roughness = 0.7
-	var half := LENGTH / 2.0
-	_part(BoxMesh.new(), Vector3(WIDTH, 0.62, LENGTH), Vector3(0, 0.66, 0), paint)
-	_part(BoxMesh.new(), Vector3(WIDTH * 0.86, 0.5, LENGTH * 0.5), Vector3(0, 1.22, -0.25), glass)
-	_part(BoxMesh.new(), Vector3(WIDTH * 0.84, 0.06, LENGTH * 0.46), Vector3(0, 1.48, -0.25), paint)
-	for z in [half + 0.03, -half - 0.03]:
-		_part(BoxMesh.new(), Vector3(WIDTH + 0.02, 0.18, 0.08), Vector3(0, 0.45, z), dark)
 	var head := _glow(Color(1.0, 0.97, 0.88), 2.0)
 	var tail := _glow(Color(0.85, 0.05, 0.05), 1.5)
-	for side in [1.0, -1.0]:
-		_part(
-			BoxMesh.new(), Vector3(0.38, 0.14, 0.04), Vector3(side * 0.6, 0.78, half + 0.01), head
+	var half := LENGTH / 2.0
+	var specs: Array[Dictionary] = []
+	var box := func(part_name: String, size: Vector3, at: Vector3, material: Variant) -> void:
+		var mesh := BoxMesh.new()
+		mesh.size = size
+		specs.append(
+			{
+				"name": part_name,
+				"mesh": mesh,
+				"transform": Transform3D(Basis(), at),
+				"material": material
+			}
 		)
-		_part(
-			BoxMesh.new(), Vector3(0.38, 0.14, 0.04), Vector3(side * 0.6, 0.8, -half - 0.01), tail
+	box.call("Body", Vector3(WIDTH, 0.62, LENGTH), Vector3(0, 0.66, 0), null)
+	box.call("Cabin", Vector3(WIDTH * 0.86, 0.5, LENGTH * 0.5), Vector3(0, 1.22, -0.25), glass)
+	box.call("Roof", Vector3(WIDTH * 0.84, 0.06, LENGTH * 0.46), Vector3(0, 1.48, -0.25), null)
+	box.call("BumperFront", Vector3(WIDTH + 0.02, 0.18, 0.08), Vector3(0, 0.45, half + 0.03), dark)
+	box.call("BumperRear", Vector3(WIDTH + 0.02, 0.18, 0.08), Vector3(0, 0.45, -half - 0.03), dark)
+	for side in [1.0, -1.0]:
+		var tag := "L" if side > 0.0 else "R"
+		box.call(
+			"Head" + tag, Vector3(0.38, 0.14, 0.04), Vector3(side * 0.6, 0.78, half + 0.01), head
+		)
+		box.call(
+			"Tail" + tag, Vector3(0.38, 0.14, 0.04), Vector3(side * 0.6, 0.8, -half - 0.01), tail
 		)
 		for z in [half - 0.85, -half + 0.85]:
 			var tyre := CylinderMesh.new()
 			tyre.top_radius = 0.33
 			tyre.bottom_radius = 0.33
-			var wheel := _part(
-				tyre, Vector3.ZERO, Vector3(side * (WIDTH / 2.0 - 0.12), 0.33, z), dark
-			)
 			tyre.height = 0.24
-			wheel.rotation = Vector3(0, 0, PI / 2.0)
+			var at := Vector3(side * (WIDTH / 2.0 - 0.12), 0.33, z)
+			(
+				specs
+				. append(
+					{
+						"name": "Wheel",
+						"mesh": tyre,
+						"transform": Transform3D(Basis(Vector3.BACK, PI / 2.0), at),
+						"material": dark,
+					}
+				)
+			)
+	return specs
 
 
-func _part(mesh: PrimitiveMesh, size: Vector3, at: Vector3, material: Material) -> MeshInstance3D:
-	if mesh is BoxMesh:
-		(mesh as BoxMesh).size = size
-	mesh.material = material
-	var instance := MeshInstance3D.new()
-	instance.mesh = mesh
-	instance.position = at
-	add_child(instance)
-	return instance
+static func paint_material(color: Color) -> StandardMaterial3D:
+	var paint := StandardMaterial3D.new()
+	paint.albedo_color = color
+	paint.metallic = 0.45
+	paint.roughness = 0.3
+	return paint
+
+
+## Builds a car's parts as child nodes of [param parent].
+static func build_visuals(parent: Node3D, color: Color) -> void:
+	var paint := paint_material(color)
+	for spec in part_specs():
+		var mesh: PrimitiveMesh = spec["mesh"]
+		mesh.material = spec["material"] if spec["material"] != null else paint
+		var instance := MeshInstance3D.new()
+		instance.name = spec["name"]
+		instance.mesh = mesh
+		instance.transform = spec["transform"]
+		parent.add_child(instance)
 
 
 static func _glow(light_color: Color, energy: float) -> StandardMaterial3D:
